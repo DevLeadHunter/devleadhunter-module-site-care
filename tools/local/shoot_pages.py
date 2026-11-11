@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import pathlib
 import sys
@@ -27,10 +28,8 @@ def api_get(path: str) -> dict:
 
 
 def settle(page: Page, seconds: float = 2.5) -> None:
-    try:
+    with contextlib.suppress(Exception):
         page.wait_for_load_state("networkidle", timeout=60_000)
-    except Exception:
-        pass
     page.wait_for_timeout(int(seconds * 1000))
     page.add_style_tag(content=HIDE_DEVTOOLS)
 
@@ -83,7 +82,7 @@ with sync_playwright() as playwright:
         page.goto(f"{WEB}/dashboard/site-care/search", timeout=240_000)
         settle(page, 3)
         shot(page, "search-1-target")
-        for index, name in enumerate(("search-2-zone", "search-3-criteria", "search-4-launch")):
+        for name in ("search-2-zone", "search-3-criteria", "search-4-launch"):
             page.get_by_role("button", name="Suivant").click()
             settle(page, 1)
             shot(page, name)

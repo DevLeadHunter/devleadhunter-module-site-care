@@ -11,6 +11,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
+import models  # noqa: F401  (every core table on the metadata)
 from core.clock import naive_utc_now
 from core.database import Base, SessionLocal, engine
 from core.product_modules.registry import product_module_registry
@@ -23,8 +24,6 @@ from models.prospect_search_candidate import ProspectSearchCandidate
 from models.user import User
 from services.auth_service import AuthService
 from services.product_module_service import product_module_service
-
-import models  # noqa: F401  (every core table on the metadata)
 
 product_module_registry.installed()
 
