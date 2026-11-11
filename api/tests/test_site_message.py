@@ -101,7 +101,7 @@ class TestFirstMessage:
 
 class TestPage:
     def test_the_page_tells_the_finding_then_the_rest_of_the_site(self) -> None:
-        page = _writer(reading_of(powered_by="PHP/7.4.33", has_dmarc=False)).page(
+        page = _writer(reading_of(powered_by="PHP/7.4.33", has_dmarc=False, has_viewport=False)).page(
             reply_address="reply-12@reply.example.com"
         )
 
@@ -116,8 +116,15 @@ class TestPage:
             "label": "Je passe votre site sur une version de PHP suivie.",
             "price_label": "190 €",
             "note": "Une seule fois. Vous payez après la correction.",
+            "tag_label": "Prix fixe",
+            "reassurances": [
+                "Je fais d’abord une sauvegarde complète.",
+                "Je travaille sur une copie, pas sur votre site.",
+                "Votre site garde la même présentation.",
+            ],
         }
         assert page["watches"] == ["Rien n’empêche quelqu’un d’envoyer des e-mails au nom du domaine."]
+        assert page["other_fixes"] == ["La page n’est pas prévue pour les téléphones : elle s’y affiche en tout petit."]
         assert page["other_points_count"] == 11
         assert "Le cadenas de sécurité est en place." in page["goods"]
         assert page["intro"].startswith("Bonjour, je suis Léo Guillaume, développeur web à Rennes.")
@@ -125,6 +132,15 @@ class TestPage:
         assert page["presenter"]["tagline"] == "Développeur web à Rennes. Je travaille seul, à distance."
         assert page["reply_mailto"].startswith("mailto:reply-12@reply.example.com?subject=Re%3A%20La%20version")
         assert "body=Bonjour" in page["forward_mailto"]
+
+    def test_a_quoted_correction_carries_no_fixed_price_tag_and_a_domain_setting_reassures_differently(self) -> None:
+        quoted = _writer(reading_of(has_viewport=False)).page(reply_address=None)
+        domain_setting = _writer(reading_of(has_spf=False)).page(reply_address=None)
+
+        assert quoted is not None and domain_setting is not None
+        assert (quoted["offer"]["price_label"], quoted["offer"]["tag_label"]) == ("Sur devis", None)
+        assert domain_setting["offer"]["reassurances"][0] == "Je ne touche pas à votre site."
+        assert "elagage-renaud.test" in domain_setting["intro"]
 
     def test_a_site_with_nothing_to_report_has_no_page(self) -> None:
         assert _writer(reading_of()).page(reply_address=None) is None

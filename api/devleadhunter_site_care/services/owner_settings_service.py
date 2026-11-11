@@ -12,6 +12,7 @@ from models.user import User
 from devleadhunter_site_care.catalog import (
     CORRECTIONS,
     DEFAULT_MONTHLY_PRICE_CENTS,
+    POINT_KEY_VALUES,
     CorrectionKey,
     PointKey,
     WritingTrigger,
@@ -90,7 +91,7 @@ class OwnerSettingsService:
         settings: OwnerSettings = OwnerSettings(
             monthly_price_cents=row.monthly_price_cents,
             trigger=WritingTrigger(row.trigger),
-            disabled_points=frozenset(PointKey(key) for key in row.disabled_points or [] if key in PointKey),
+            disabled_points=frozenset(PointKey(key) for key in row.disabled_points or [] if key in POINT_KEY_VALUES),
             presenter=Presenter(
                 name=row.presenter_name or self._account_name(db, user_id),
                 role=row.presenter_role,

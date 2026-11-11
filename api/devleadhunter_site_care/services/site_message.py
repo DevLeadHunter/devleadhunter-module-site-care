@@ -21,6 +21,17 @@ from devleadhunter_site_care.services.site_wording import LeadWording, LeadWordi
 _OFFER_NOTE_FIXED: str = "Une seule fois. Vous payez après la correction."
 _OFFER_NOTE_QUOTED: str = "Je vous donne le prix avant de commencer. Vous payez après la correction."
 _URL_PATTERN: re.Pattern[str] = re.compile(r"https?://[^\s<]+")
+# What reassures an owner before a correction: on his site itself, or on the settings of his domain name.
+_SITE_REASSURANCES: tuple[str, ...] = (
+    "Je fais d’abord une sauvegarde complète.",
+    "Je travaille sur une copie, pas sur votre site.",
+    "Votre site garde la même présentation.",
+)
+_DOMAIN_REASSURANCES: tuple[str, ...] = (
+    "Je ne touche pas à votre site.",
+    "Vos e-mails continuent d’arriver pendant le réglage.",
+    "Je vous explique ce que j’ai changé.",
+)
 
 
 class Money:
@@ -173,16 +184,15 @@ class SiteMessageWriter:
         wording: LeadWording = LeadWordings.of(lead, self._subject.domain)
         presenter: Presenter = self._settings.presenter
         price_cents: int | None = self._lead_price_cents(lead)
-        other_issues: list[SitePoint] = [
-            point for point in self._summary.fixes + self._summary.watches if point is not lead
-        ]
+        other_fixes: list[SitePoint] = [point for point in self._summary.fixes if point is not lead]
+        other_watches: list[SitePoint] = [point for point in self._summary.watches if point is not lead]
         return {
             "business_name": self._subject.business_name,
             "domain": self._subject.domain,
             "title": {"start": wording.title[0], "mark": wording.title[1], "end": wording.title[2]},
             "intro": (
                 f"Bonjour, {self._lower_first(self._introduction())} J’ai regardé votre site "
-                "comme le ferait un visiteur, sans rien y toucher."
+                f"{self._subject.domain} comme le ferait un visiteur, sans rien y toucher."
             ),
             "seen": {"label": wording.seen_label, "lead": wording.seen_lead, "rest": wording.seen_rest},
             "changes": list(wording.changes),
@@ -191,10 +201,17 @@ class SiteMessageWriter:
                 "label": wording.offer_label,
                 "price_label": Money.label(price_cents),
                 "note": _OFFER_NOTE_QUOTED if price_cents is None else _OFFER_NOTE_FIXED,
+                "tag_label": None if price_cents is None else "Prix fixe",
+                "reassurances": list(
+                    _DOMAIN_REASSURANCES
+                    if POINT_BY_KEY[lead.key].correction == CorrectionKey.MAIL
+                    else _SITE_REASSURANCES
+                ),
             },
             "goods": [self._good_fact(point) for point in self._good_points()],
-            "watches": [point.fact for point in other_issues],
-            "other_points_count": len(self._good_points()) + len(other_issues),
+            "other_fixes": [point.fact for point in other_fixes],
+            "watches": [point.fact for point in other_watches],
+            "other_points_count": len(self._good_points()) + len(other_fixes) + len(other_watches),
             "presenter": {
                 "name": presenter.name,
                 "tagline": " ".join(part for part in (self._role_sentence(), presenter.tagline) if part),

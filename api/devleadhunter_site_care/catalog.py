@@ -158,6 +158,8 @@ POINTS: tuple[PointDefinition, ...] = (
     ),
 )
 POINT_BY_KEY: dict[PointKey, PointDefinition] = {point.key: point for point in POINTS}
+# « "php" in PointKey » raises on Python 3.11, the production interpreter: compare with the values instead.
+POINT_KEY_VALUES: frozenset[str] = frozenset(key.value for key in PointKey)
 
 CORRECTIONS: tuple[CorrectionDefinition, ...] = (
     CorrectionDefinition(CorrectionKey.CLEANUP, "Nettoyage du site après piratage", 39000),
@@ -172,6 +174,7 @@ CORRECTIONS: tuple[CorrectionDefinition, ...] = (
 CORRECTION_BY_KEY: dict[CorrectionKey, CorrectionDefinition] = {
     correction.key: correction for correction in CORRECTIONS
 }
+CORRECTION_KEY_VALUES: frozenset[str] = frozenset(key.value for key in CorrectionKey)
 DEFAULT_MONTHLY_PRICE_CENTS: int = 10000
 
 KIND_LABELS: dict[IssueKind, str] = {

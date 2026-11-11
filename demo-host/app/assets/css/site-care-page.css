@@ -1,0 +1,23 @@
+/* The host's Tailwind entry does not scan this layer: without this one, the page loses every utility class. */
+@import 'tailwindcss' source(none);
+@source '../../**/*.{vue,ts}';
+
+@theme {
+  /* Rubik is loaded by the host's fonts.css. */
+  --font-site-care: 'Rubik', ui-sans-serif, system-ui, sans-serif;
+  --color-site-care-ink: #141414;
+  --color-site-care-ink-muted: #4b4b47;
+  --color-site-care-ink-soft: #66665f;
+  --color-site-care-band: #f6f6f3;
+  --color-site-care-line: rgb(20 20 20 / 0.12);
+  --color-site-care-line-strong: rgb(20 20 20 / 0.22);
+  --color-site-care-violet: #6f5fe0;
+  --color-site-care-violet-strong: #5b4bd0;
+  --color-site-care-lavender: #e6e1ff;
+  --color-site-care-lavender-soft: #f5f3ff;
+  --color-site-care-amber: #b45309;
+  --color-site-care-amber-soft: #fdf1dc;
+  --color-site-care-amber-line: rgb(180 83 9 / 0.3);
+  --shadow-site-care-offer: 0 18px 40px rgb(111 95 224 / 0.12);
+  --shadow-site-care-portrait: 0 18px 40px rgb(20 20 20 / 0.08);
+}

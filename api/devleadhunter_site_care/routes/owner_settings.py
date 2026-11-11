@@ -9,7 +9,15 @@ from core.database import get_db
 from models.user import User
 from services.auth_service import get_current_active_user
 
-from devleadhunter_site_care.catalog import CORRECTIONS, POINTS, CorrectionKey, PointKey, WritingTrigger
+from devleadhunter_site_care.catalog import (
+    CORRECTION_KEY_VALUES,
+    CORRECTIONS,
+    POINT_KEY_VALUES,
+    POINTS,
+    CorrectionKey,
+    PointKey,
+    WritingTrigger,
+)
 from devleadhunter_site_care.schemas.owner_settings import OwnerSettingsView, PointSwitch, PresenterView, PriceLine
 from devleadhunter_site_care.services.owner_settings_service import OwnerSettings, Presenter, owner_settings_service
 from devleadhunter_site_care.services.send_service import send_service
@@ -80,7 +88,7 @@ async def save_settings(
     current: OwnerSettings = owner_settings_service.get(db, current_user.id)
     prices: dict[CorrectionKey, int | None] = dict(current.prices)
     for line in body.prices:
-        if line.key in CorrectionKey and line.price_cents is not None:
+        if line.key in CORRECTION_KEY_VALUES and line.price_cents is not None:
             prices[CorrectionKey(line.key)] = line.price_cents
     saved: OwnerSettings = owner_settings_service.save(
         db,
@@ -90,7 +98,7 @@ async def save_settings(
             monthly_price_cents=body.monthly_price_cents,
             trigger=WritingTrigger(body.trigger),
             disabled_points=frozenset(
-                PointKey(point.key) for point in body.points if point.key in PointKey and not point.is_enabled
+                PointKey(point.key) for point in body.points if point.key in POINT_KEY_VALUES and not point.is_enabled
             ),
             presenter=Presenter(
                 name=body.presenter.name,

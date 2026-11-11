@@ -221,8 +221,9 @@ d'entreprises ou que la recherche a échoué.
   "seen": { "label": "Point à corriger", "lead": "Votre site tourne avec PHP 7.4, une version qui n’est plus corrigée.", "rest": "PHP est le logiciel qui fait fonctionner votre site. La version 7.4 ne reçoit plus aucun correctif de sécurité depuis novembre 2022." },
   "changes": ["Une faille découverte aujourd’hui…", "Votre hébergeur peut retirer cette version…"],
   "proof_steps": ["Appelez votre hébergeur, ou écrivez-lui.", "Demandez-lui : « Quelle version de PHP fait tourner mon site ? »"],
-  "offer": { "label": "Je passe votre site sur une version de PHP suivie.", "price_label": "190 €", "note": "Une seule fois. Vous payez après la correction." },
+  "offer": { "label": "Je passe votre site sur une version de PHP suivie.", "price_label": "190 €", "note": "Une seule fois. Vous payez après la correction.", "tag_label": "Prix fixe", "reassurances": ["Je fais d’abord une sauvegarde complète.", "Je travaille sur une copie, pas sur votre site.", "Votre site garde la même présentation."] },
   "goods": ["Le cadenas de sécurité est en place."],
+  "other_fixes": ["La page n’est pas prévue pour les téléphones : elle s’y affiche en tout petit."],
   "watches": ["Google n’a pas de fiche à lire sur votre entreprise."],
   "other_points_count": 11,
   "presenter": { "name": "Léo Guillaume", "tagline": "Développeur web à Rennes. Je travaille seul, à distance, pour des entreprises comme la vôtre.", "site_url": "https://dibodev.fr", "site_label": "dibodev.fr", "photo_url": "" },
@@ -231,5 +232,9 @@ d'entreprises ou que la recherche a échoué.
 }
 ```
 
+`offer.tag_label` vaut `null` pour une correction sur devis ; `offer.reassurances` change avec la correction (sur le
+site, ou sur les réglages du nom de domaine). `intro` contient le domaine, que la page met en gras.
+
 La page signale son ouverture par le beacon du cœur : `POST /api/v1/demo-events` avec
-`{ "demo_slug": "<slug>", "event": "site_care_page_opened" }`.
+`{ "demo_slug": "<slug>", "event": "site_care_page_opened" }`, puis `site_care_page_reply_clicked` et
+`site_care_page_forward_clicked` au clic sur ses deux boutons.

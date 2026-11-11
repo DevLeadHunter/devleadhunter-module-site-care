@@ -32,6 +32,11 @@ logger = logging.getLogger(__name__)
 _MIGRATIONS_PACKAGE: str = "devleadhunter_site_care.migrations"
 PAGE_OPENED_EVENT: str = "site_care_page_opened"
 PAGE_REPLY_CLICKED_EVENT: str = "site_care_page_reply_clicked"
+PAGE_FORWARD_CLICKED_EVENT: str = "site_care_page_forward_clicked"
+_CLICK_WORDINGS: dict[str, str] = {
+    PAGE_REPLY_CLICKED_EVENT: "a cliqué sur « Me répondre » depuis sa page",
+    PAGE_FORWARD_CLICKED_EVENT: "a cliqué sur « Ce n’est pas moi qui gère le site » depuis sa page",
+}
 
 
 class SiteCareModule(ProductModule):
@@ -102,30 +107,31 @@ class SiteCareModule(ProductModule):
             db: Active database session.
             payload: The event the page beaconed.
         """
-        if payload.is_automated_browser or payload.event not in (PAGE_OPENED_EVENT, PAGE_REPLY_CLICKED_EVENT):
+        if payload.is_automated_browser or payload.event not in (PAGE_OPENED_EVENT, *_CLICK_WORDINGS):
             return
         site: SiteCareSite | None = db.execute(
             select(SiteCareSite).where(SiteCareSite.page_slug == payload.demo_slug, SiteCareSite.archived_at.is_(None))
         ).scalar_one_or_none()
         if site is None:
             return
-        is_reply_click: bool = payload.event == PAGE_REPLY_CLICKED_EVENT
-        is_first_open: bool = not is_reply_click and site.page_opened_at is None
-        if not is_reply_click:
+        click_wording: str | None = _CLICK_WORDINGS.get(payload.event)
+        is_button_click: bool = click_wording is not None
+        is_first_open: bool = not is_button_click and site.page_opened_at is None
+        if not is_button_click:
             site.page_opened_at = site.page_opened_at or naive_utc_now()
             site.page_open_count += 1
             db.commit()
-        if not (is_first_open or is_reply_click):
+        if not (is_first_open or is_button_click):
             return
         try:
             await notification_service.notify_module_event(
                 user_id=site.user_id,
                 category=MODULE_KEY,
-                level="success" if is_reply_click else "info",
+                level="success" if is_button_click else "info",
                 title=site.business_name,
                 body=(
-                    f"{self.notification_tag} · a cliqué sur « Me répondre » depuis sa page"
-                    if is_reply_click
+                    f"{self.notification_tag} · {click_wording}"
+                    if click_wording is not None
                     else f"{self.notification_tag} · a ouvert la page préparée pour lui"
                 ),
                 url=f"/dashboard/site-care?tab=all&site={site.id}",
