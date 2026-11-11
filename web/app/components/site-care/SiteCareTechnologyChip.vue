@@ -9,7 +9,6 @@
 <script lang="ts" setup>
 import type { SiteCareTechnologyChipProps } from '../../types/SiteCareTechnologyChip'
 
-/** Chip naming the technology an issue is about (« PHP 7.4 », « WordPress 6.5 »), shown next to the issue tag. */
 const props: SiteCareTechnologyChipProps = defineProps({
   technology: {
     type: String,

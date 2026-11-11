@@ -23,10 +23,7 @@
     </UiEmptyState>
 
     <template v-else>
-      <section
-        class="grid grid-cols-2 gap-4 @3xl:grid-cols-3 [&>*:last-child:nth-child(odd)]:col-span-2 @3xl:[&>*:last-child:nth-child(odd)]:col-span-1"
-        aria-label="Chiffres des suivis"
-      >
+      <section class="grid grid-cols-2 gap-4 @3xl:grid-cols-3" aria-label="Chiffres des suivis">
         <UiStatCard label="Clients en suivi" :value="carePlanList.stats.client_count" icon="i-lucide-users" />
         <UiStatCard
           label="Revenu par mois"
@@ -37,6 +34,7 @@
           label="Rapports à envoyer"
           :value="carePlanList.stats.reports_due_count"
           icon="i-lucide-file-text"
+          class="col-span-2 @3xl:col-span-1"
         />
       </section>
 
@@ -179,7 +177,6 @@ useSeoMeta({ title: 'Suivis · DevLeadHunter' })
 
 const toast: UseToastReturn = useToast()
 
-/** A report still to send stands out; a report sent reads as done. */
 const REPORT_STATE_BADGE_CLASSES: Record<SiteCareCarePlanReportState, string> = {
   due: 'app-badge--strong',
   sent: 'app-badge--success',
@@ -187,7 +184,6 @@ const REPORT_STATE_BADGE_CLASSES: Record<SiteCareCarePlanReportState, string> = 
 
 const carePlanList: Ref<SiteCareCarePlanListResponse | null> = ref(null)
 const isLoadingCarePlans: Ref<boolean> = ref(true)
-/** The follow-up the open confirmation is about. */
 const carePlanToConfirm: Ref<SiteCareCarePlan | null> = ref(null)
 const pendingAction: Ref<SiteCareCarePlanPendingAction | null> = ref(null)
 const actionFailure: Ref<SiteCareCarePlanActionFailure | null> = ref(null)
@@ -249,8 +245,7 @@ function askToStopCarePlan(carePlan: SiteCareCarePlan): void {
 }
 
 /**
- * Run a confirmed action on the follow-up it was confirmed for, then read the list again; a refusal of the API is
- * written under the row.
+ * Run a confirmed action on its follow-up, then read the list again; a refusal of the API shows under the row.
  * @param action - The action, shown as running on its button meanwhile.
  * @param request - The call to make for the follow-up.
  * @param successMessage - The sentence to show once done.

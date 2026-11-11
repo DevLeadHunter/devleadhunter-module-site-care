@@ -233,7 +233,6 @@ const WRITING_TRIGGER_OPTIONS: UiRadioCardOption<SiteCareWritingTrigger>[] = [
 /** The settings as the API holds them; nothing can be saved until they are read, so a failed read never overwrites them. */
 const savedSettings: Ref<SiteCareSettings | null> = ref(null)
 const form: Ref<SiteCareSettingsForm | null> = ref(null)
-/** The form as it was when read or saved, to tell whether something changed since. */
 const savedFormSnapshot: Ref<string> = ref('')
 const isLoadingSettings: Ref<boolean> = ref(true)
 const isSaving: Ref<boolean> = ref(false)
@@ -304,7 +303,7 @@ function isValidEuroAmount(euros: unknown): boolean {
  * @param settings - The settings as the API holds them.
  * @returns The form.
  */
-function formOf(settings: SiteCareSettings): SiteCareSettingsForm {
+function buildSettingsForm(settings: SiteCareSettings): SiteCareSettingsForm {
   const fixedPrices: SiteCareFixedPriceField[] = []
   for (const price of settings.prices) {
     if (price.price_cents !== null) {
@@ -326,7 +325,7 @@ function formOf(settings: SiteCareSettings): SiteCareSettingsForm {
  * @param currentSettings - The settings the form was built from.
  * @returns The settings to save.
  */
-function settingsOf(editedForm: SiteCareSettingsForm, currentSettings: SiteCareSettings): SiteCareSettings {
+function buildSettingsToSave(editedForm: SiteCareSettingsForm, currentSettings: SiteCareSettings): SiteCareSettings {
   return {
     prices: currentSettings.prices.map((price: SiteCarePrice): SiteCarePrice => {
       const editedPrice: SiteCareFixedPriceField | undefined = editedForm.fixedPrices.find(
@@ -354,8 +353,8 @@ function settingsOf(editedForm: SiteCareSettingsForm, currentSettings: SiteCareS
  */
 function showSettings(settings: SiteCareSettings): void {
   savedSettings.value = settings
-  form.value = formOf(settings)
-  savedFormSnapshot.value = JSON.stringify(formOf(settings))
+  form.value = buildSettingsForm(settings)
+  savedFormSnapshot.value = JSON.stringify(buildSettingsForm(settings))
 }
 
 /**
@@ -386,7 +385,7 @@ async function saveSettings(): Promise<void> {
   hasJustSaved.value = false
   saveFailureMessage.value = null
   try {
-    showSettings(await SiteCareService.saveSettings(settingsOf(form.value, savedSettings.value)))
+    showSettings(await SiteCareService.saveSettings(buildSettingsToSave(form.value, savedSettings.value)))
     hasJustSaved.value = true
   } catch (error: unknown) {
     saveFailureMessage.value = SiteCareService.failureMessage(error, 'Les réglages n’ont pas pu être enregistrés.')

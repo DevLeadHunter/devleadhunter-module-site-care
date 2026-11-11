@@ -16,7 +16,6 @@ export type SiteCareContactChannelChoice = {
   isAvailable: boolean
 }
 
-/** One line of the recap shown before a search is launched. */
 export type SiteCareSearchRecapRow = {
   label: string
   value: string

@@ -238,7 +238,6 @@
           </div>
         </div>
 
-        <!-- Stuck to the bottom of the scrolling area, like the core's search wizard; on a phone the main button takes the width. -->
         <div
           class="sticky bottom-0 z-10 mt-auto flex items-center gap-2 rounded-full border border-[var(--app-line)] bg-[var(--app-surface)]/90 p-1.5 shadow-lg backdrop-blur sm:justify-between sm:gap-3 sm:px-3 sm:py-2"
         >
@@ -326,7 +325,6 @@ const SEARCH_STEPS: UiWizardStep[] = [
 
 const DEFAULT_WANTED_PROSPECT_COUNT: number = 50
 
-/** Email only for now: the SMS fallback is shown so it is known to come, but it cannot be picked. */
 const CONTACT_CHANNEL_CHOICES: SiteCareContactChannelChoice[] = [
   {
     key: 'email',
@@ -526,8 +524,7 @@ function removeCity(removedCity: string): void {
 }
 
 /**
- * Show a step and bring the page back to its top; a city still in the field is kept. Nothing moves once the
- * search is launched.
+ * Show a step and bring the page back to its top, keeping a city still in the field; no move once launched.
  * @param step - Target step (1-based).
  */
 function goToStep(step: number): void {

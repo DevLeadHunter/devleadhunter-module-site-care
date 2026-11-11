@@ -1,6 +1,6 @@
 import type { SiteCareLeadKind, SiteCareTone } from './SiteCareSite'
 
-/** Props of the tag naming a type of issue: its icon comes from `kind`, its word and tone from the API. */
+/** `label` and `tone` are shown as the API sends them; only the icon is picked here, from `kind`. */
 export type SiteCareIssueTagProps = {
   kind: SiteCareLeadKind
   label: string

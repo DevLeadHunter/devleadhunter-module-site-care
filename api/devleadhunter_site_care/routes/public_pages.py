@@ -9,14 +9,15 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 
 from devleadhunter_site_care.models.site import SiteCareSite
+from devleadhunter_site_care.schemas.public_page import PublicPage
 from devleadhunter_site_care.services.owner_settings_service import owner_settings_service
 from devleadhunter_site_care.services.send_service import send_service
 
 router = APIRouter(prefix="/site-care/public", tags=["site-care-public"])
 
 
-@router.get("/pages/{slug}")
-async def get_public_page(slug: str, response: Response, db: Session = Depends(get_db)) -> dict[str, object]:
+@router.get("/pages/{slug}", response_model=PublicPage)
+async def get_public_page(slug: str, response: Response, db: Session = Depends(get_db)) -> PublicPage:
     """
     The content of the page of one site, for the demo host to render.
 
@@ -41,4 +42,4 @@ async def get_public_page(slug: str, response: Response, db: Session = Depends(g
     if page is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page introuvable")
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
-    return page
+    return PublicPage.model_validate(page)

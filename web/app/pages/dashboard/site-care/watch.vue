@@ -68,14 +68,12 @@ definePageMeta({ layout: 'dashboard', middleware: ['auth', 'site-care-module'] }
 
 useSeoMeta({ title: 'Veille · DevLeadHunter' })
 
-/** Icon of an event whose kind the dashboard does not know yet. */
 const UNKNOWN_EVENT_ICON: string = 'i-lucide-bell'
 
 const watchFeed: Ref<SiteCareWatchResponse | null> = ref(null)
 const isLoadingWatch: Ref<boolean> = ref(true)
 const hasWatchLoadFailed: Ref<boolean> = ref(false)
 
-/** The blocks that have something to show, in display order. */
 const watchSections: ComputedRef<SiteCareWatchSection[]> = computed((): SiteCareWatchSection[] => {
   if (watchFeed.value === null) {
     return []

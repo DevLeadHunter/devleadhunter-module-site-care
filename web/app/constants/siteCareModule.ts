@@ -3,7 +3,6 @@ import type { DashboardModuleDefinition, UiSidebarGroup } from '~/types/UiSideba
 
 export const SITE_CARE_MODULE_KEY: ProductModuleKey = 'site-care'
 
-/** The module's own section of the dashboard: reaching one of its pages switches the sidebar to the module. */
 export const SITE_CARE_SECTION_PATH: string = '/dashboard/site-care'
 
 export const SITE_CARE_SEARCH_PATH: string = `${SITE_CARE_SECTION_PATH}/search`
@@ -14,10 +13,6 @@ export const SITE_CARE_CARE_PLANS_PATH: string = `${SITE_CARE_SECTION_PATH}/care
 
 export const SITE_CARE_SETTINGS_PATH: string = '/dashboard/settings/site-care'
 
-/**
- * The module's navigation: its prospects are businesses that already have a website, so the list, the search and
- * the watch are its own pages; the dashboard and the email follow-up are the core's.
- */
 const SITE_CARE_NAV_GROUPS: UiSidebarGroup[] = [
   {
     heading: 'Pilotage',
@@ -37,7 +32,6 @@ const SITE_CARE_NAV_GROUPS: UiSidebarGroup[] = [
   },
 ]
 
-/** Site care in the module switcher, with the label the core shows for its activity-log entries. */
 export const SITE_CARE_DASHBOARD_MODULE: DashboardModuleDefinition = {
   key: SITE_CARE_MODULE_KEY,
   label: 'Entretien de sites',

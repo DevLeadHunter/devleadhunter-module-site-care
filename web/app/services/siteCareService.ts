@@ -17,7 +17,6 @@ import { ApiClient } from '~/services/api'
 
 const SITE_CARE_API_BASE: string = '/api/v1/site-care'
 
-/** What `ApiClient` throws when a failed response carried no sentence of its own. */
 const API_CLIENT_FALLBACK_PREFIX: string = 'API request failed'
 
 /** HTTP client of the site care module: the prospects' sites, the searches, the watch, the follow-ups, the settings. */
@@ -111,9 +110,7 @@ export class SiteCareService {
    * @returns The search, or null when none was ever launched.
    */
   static async getCurrentSearch(): Promise<SiteCareSearch | null> {
-    const search: SiteCareSearch | null | undefined = await ApiClient.get<SiteCareSearch | null | undefined>(
-      `${SITE_CARE_API_BASE}/searches/current`,
-    )
+    const search: SiteCareSearch | null | undefined = await ApiClient.get(`${SITE_CARE_API_BASE}/searches/current`)
     return search ?? null
   }
 
@@ -180,8 +177,7 @@ export class SiteCareService {
   }
 
   /**
-   * The sentence to show after a failed call. The API says in plain words why it refuses (a 409 `detail`): that
-   * sentence is kept. A dead network or an answer with nothing readable gets the fallback instead.
+   * Pick the sentence to show after a failed call: the API's own reason (a 409 `detail`) when it gave one.
    * @param error - What the call threw.
    * @param fallback - The sentence to show when the API gave none.
    * @returns The API's own sentence, else the fallback.

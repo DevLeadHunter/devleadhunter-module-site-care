@@ -5,7 +5,6 @@ import type {
   SiteCareWritingTrigger,
 } from './SiteCareSettings'
 
-/** The price of a correction as the form edits it, in euros. */
 export type SiteCareFixedPriceField = {
   key: SiteCarePriceKey
   label: string
@@ -21,7 +20,6 @@ export type SiteCareSettingsForm = {
   presenter: SiteCarePresenter
 }
 
-/** The points looked at on a site, under the family the API files them in. */
 export type SiteCareCheckedPointFamily = {
   label: string
   points: SiteCareCheckedPoint[]

@@ -16,10 +16,6 @@ import type { SiteCareIssueTagProps } from '../../types/SiteCareIssueTag'
 import type { SiteCareLeadKind, SiteCareTone } from '../../types/SiteCareSite'
 import { SITE_CARE_ISSUE_KIND_ICONS, SITE_CARE_TONE_BADGE_CLASSES } from '../../constants/siteCareLabels'
 
-/**
- * Tag that names a type of issue with an icon and a word, so it reads at a glance: red to fix, amber to watch,
- * green when nothing is to report. A hacked site stands out in solid red.
- */
 const props: SiteCareIssueTagProps = defineProps({
   kind: {
     type: String as PropType<SiteCareLeadKind>,

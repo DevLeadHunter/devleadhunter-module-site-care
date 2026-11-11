@@ -1,4 +1,3 @@
-/** The nine types of issue a site can show, as the API names them. */
 export type SiteCareIssueKind =
   | 'hack'
   | 'security'
@@ -27,7 +26,6 @@ export type SiteCareSiteStateKey =
   | 'review'
   | 'do_not_contact'
 
-/** The twelve things looked at on a site. */
 export type SiteCarePointKey =
   | 'https'
   | 'php'
@@ -42,7 +40,6 @@ export type SiteCarePointKey =
   | 'mobile'
   | 'search'
 
-/** The finding a list row leads with (`SiteLead` of the API). */
 export type SiteCareSiteLead = {
   kind: SiteCareLeadKind
   kind_label: string
@@ -57,12 +54,11 @@ export type SiteCareSiteState = {
   tone: SiteCareTone
 }
 
-/** One row of « Mes prospects » (`SiteListItem` of the API). */
 export type SiteCareSiteListItem = {
   id: number
   business_name: string
   trade_label: string
-  city: string
+  city: string | null
   country: string
   domain: string
   website: string
@@ -74,7 +70,6 @@ export type SiteCareSiteListItem = {
   checked_at: string
 }
 
-/** One point to fix or to watch on a site (`SitePoint` of the API). */
 export type SiteCareSitePoint = {
   key: SiteCarePointKey
   kind: SiteCareIssueKind
@@ -102,14 +97,12 @@ export type SiteCareSentMessage = {
   status_label: string
 }
 
-/** The monthly follow-up of a site, as its sheet carries it. */
 export type SiteCareSiteCarePlan = {
   id: number
   monthly_price_cents: number
   started_at: string
 }
 
-/** The sheet of a prospect (`SiteDetail` of the API): the list row plus everything seen and what can be sent. */
 export type SiteCareSiteDetail = SiteCareSiteListItem & {
   phone: string | null
   google_rating: number | null
@@ -161,24 +154,20 @@ export type SiteCareSiteListQuery = {
   offset: number
 }
 
-/** One entry of the « type of issue » filter of the list. */
 export type SiteCareIssueKindFilter = {
   kind: SiteCareIssueKind
   label: string
 }
 
-/** One tab of « Mes prospects », before its count. */
 export type SiteCareSiteTabLabel = {
   key: SiteCareSiteTab
   label: string
 }
 
-/** Body of `PATCH /site-care/sites/{id}`. */
 export type SiteCareSiteEmailUpdate = {
   email: string
 }
 
-/** Body of `POST /site-care/sites/{id}/send`. */
 export type SiteCareSendPayload = {
   with_page_link: boolean
 }

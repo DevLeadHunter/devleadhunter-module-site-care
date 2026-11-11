@@ -7,7 +7,6 @@ export type SiteCareWatchTarget = {
   kind: SiteCareIssueKind | null
 }
 
-/** One reason to write today (`WatchEvent` of the API). */
 export type SiteCareWatchEvent = {
   key: string
   kind: SiteCareLeadKind
@@ -20,7 +19,6 @@ export type SiteCareWatchEvent = {
   target: SiteCareWatchTarget
 }
 
-/** Answer of `GET /site-care/watch`. */
 export type SiteCareWatchResponse = {
   today: SiteCareWatchEvent[]
   deadlines: SiteCareWatchEvent[]

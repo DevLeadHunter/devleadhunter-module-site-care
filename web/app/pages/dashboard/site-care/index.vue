@@ -222,19 +222,15 @@ const toast: UseToastReturn = useToast()
 const drawerStack: ReturnType<typeof useDrawerStackStore> = useDrawerStackStore()
 const { siteChangeCount }: UseSiteCareSiteChangesReturn = useSiteCareSiteChanges()
 
-/** Value of a filter that keeps everything. */
 const ALL_FILTER_VALUE: string = 'all'
 
-/** Rows asked per call, and the most the API gives in one call. */
 const SITE_PAGE_SIZE: number = 100
 const SITE_LIST_MAXIMUM_LIMIT: number = 500
 
 const SEARCH_TEXT_DEBOUNCE_MS: number = 300
 
-/** While a search runs, its progress and the list are read again at this pace. */
 const SEARCH_PROGRESS_REFRESH_INTERVAL_MS: number = 5000
 
-/** How long the note of the last search (not enough businesses, failure) stays above the list. */
 const LAST_SEARCH_NOTE_LIFETIME_MS: number = 24 * 60 * 60 * 1000
 
 const ISSUE_KIND_OPTIONS: SelectFieldOption[] = [
@@ -244,9 +240,7 @@ const ISSUE_KIND_OPTIONS: SelectFieldOption[] = [
   ),
 ]
 
-/** The latest answer of the API: its counts cover every site, its rows only the first window. */
 const siteList: Ref<SiteCareSiteListResponse | null> = ref(null)
-/** The rows on screen: the first window, plus the ones « Afficher plus » added. */
 const sites: Ref<SiteCareSiteListItem[]> = ref([])
 const isLoadingSites: Ref<boolean> = ref(true)
 const isLoadingMoreSites: Ref<boolean> = ref(false)
@@ -254,11 +248,9 @@ const activeTab: Ref<SiteCareSiteTab> = ref(parseSiteTab(firstQueryValue(route.q
 const tradeFilter: Ref<string> = ref(ALL_FILTER_VALUE)
 const issueKindFilter: Ref<string> = ref(parseIssueKind(firstQueryValue(route.query.kind)) ?? ALL_FILTER_VALUE)
 const searchText: Ref<string> = ref('')
-/** The text the list is filtered on: `searchText` once the typing paused. */
 const appliedSearchText: Ref<string> = ref('')
 const currentSearch: Ref<SiteCareSearch | null> = ref(null)
 
-/** Number of the latest list request: an answer that is not the latest one is dropped. */
 let latestSiteRequestNumber: number = 0
 let searchTextTimer: ReturnType<typeof setTimeout> | null = null
 let searchProgressTimer: ReturnType<typeof setTimeout> | null = null

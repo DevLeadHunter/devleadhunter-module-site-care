@@ -228,7 +228,7 @@ class SiteMessageWriter:
         }
 
     def _introduction(self) -> str:
-        """« Je suis Léo Guillaume, développeur web à Rennes. », from what the owner typed about himself."""
+        """« Je suis {name}, {role}. », from what the owner typed about himself."""
         presenter: Presenter = self._settings.presenter
         if presenter.name and presenter.role:
             return f"Je suis {presenter.name}, {presenter.role.rstrip('.')}."

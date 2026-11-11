@@ -369,10 +369,6 @@ import { FieldsValidation } from '~/utils/fieldsValidation'
 import { SITE_CARE_TONE_BADGE_CLASSES } from '../../constants/siteCareLabels'
 import { SiteCareService } from '../../services/siteCareService'
 
-/**
- * Sheet of one prospect of the site care module, in the core's drawer stack: what was seen on its site, what can
- * be offered, the message to send, and the actions on the prospect. It reads the site from its identifier.
- */
 const props: UiSiteCareProspectDrawerProps = defineProps({
   open: {
     type: Boolean,
@@ -508,7 +504,6 @@ async function loadSite(siteId: number): Promise<void> {
       site.value = null
     }
   } finally {
-    // A sheet that moved on to another site keeps its own loading state.
     if (isShowing(siteId)) {
       isLoadingSite.value = false
     }

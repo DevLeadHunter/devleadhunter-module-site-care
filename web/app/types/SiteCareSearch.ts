@@ -10,7 +10,6 @@ export type SiteCareSearchTradeOption = {
   available_by_country: Record<string, number>
 }
 
-/** Answer of `GET /site-care/search-options`: what a search can target, with how many businesses are available. */
 export type SiteCareSearchOptions = {
   countries: SiteCareSearchCountryOption[]
   trades: SiteCareSearchTradeOption[]
