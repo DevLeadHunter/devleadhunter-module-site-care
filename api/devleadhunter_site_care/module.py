@@ -59,7 +59,7 @@ class SiteCareModule(ProductModule):
     demo_beacon_prefix: ClassVar[str | None] = "site_care_"
 
     # Tracked by name in schema_migrations: a name never changes once it ran in production.
-    MIGRATION_NAMES: ClassVar[tuple[str, ...]] = ("add_site_care_tables",)
+    MIGRATION_NAMES: ClassVar[tuple[str, ...]] = ("add_site_care_tables", "add_site_care_open_map_search")
 
     def load(self) -> None:
         """Register the module's tables on the core's metadata, before ``init_db()`` creates the missing ones."""

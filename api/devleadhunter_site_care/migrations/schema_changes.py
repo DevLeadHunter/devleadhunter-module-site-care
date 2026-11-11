@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Table, inspect
+from sqlalchemy import Table, inspect, text
 from sqlalchemy.engine import Engine
 
 from core.database import Base
@@ -10,7 +10,7 @@ from core.database import Base
 
 class SiteCareSchemaChanges:
     """
-    Creates the module's missing tables and leaves alone what already exists.
+    Creates the module's missing tables and columns, and leaves alone what already exists.
 
     ``init_db()`` runs before the migrations and creates every missing table from the models, so on an up-to-date
     database each step finds its work done: every step can run any number of times.
@@ -37,3 +37,22 @@ class SiteCareSchemaChanges:
             table.create(self._engine)
             created.append(table.name)
         return created
+
+    def add_missing_columns(self, table_name: str, definitions: dict[str, str]) -> list[str]:
+        """
+        Add to a table the columns it does not have yet.
+
+        Args:
+            table_name: The table, one of the module's (never a user's text).
+            definitions: Each column's name with its SQL definition, written so MySQL and SQLite both read it.
+
+        Returns:
+            The names of the columns added.
+        """
+        present: set[str] = {column["name"] for column in inspect(self._engine).get_columns(table_name)}
+        missing: dict[str, str] = {name: sql for name, sql in definitions.items() if name not in present}
+        if missing:
+            with self._engine.begin() as connection:
+                for name, sql in missing.items():
+                    connection.execute(text(f"ALTER TABLE `{table_name}` ADD COLUMN `{name}` {sql}"))
+        return list(missing)

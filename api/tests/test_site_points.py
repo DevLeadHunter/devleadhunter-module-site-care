@@ -88,6 +88,18 @@ class TestHackedPage:
             "guncel-bahis-siteleri.example"
         ]
 
+    def test_a_link_to_a_slot_or_lottery_site_marks_a_hacked_page(self) -> None:
+        html = (
+            '<a href="https://jeux.example/">Situs Slot Online terpercaya</a>'
+            '<a href="https://loterie.example/">Bandar Togel</a>'
+            '<a href="https://machines-a-sous.test/">Réparation de machines à sous anciennes</a>'
+        )
+
+        assert HomePageFacts.outside_gambling_links(html, "bellanger-electricite.test") == [
+            "jeux.example",
+            "loterie.example",
+        ]
+
     def test_a_supermarket_or_a_town_called_casino_is_not_a_hack(self) -> None:
         html = (
             '<a href="https://www.supermarche-casino.test/magasin">Géant Casino, notre partenaire</a>'

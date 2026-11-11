@@ -28,10 +28,17 @@ from services.auth_service import AuthService
 from services.product_module_service import product_module_service
 from tests.conftest import *  # noqa: F403
 
+from devleadhunter_site_care.catalog import BusinessFamily
 from devleadhunter_site_care.module import SiteCareModule
 from devleadhunter_site_care.services import search_service as search_service_module
 from devleadhunter_site_care.services import send_service as send_service_module
 from devleadhunter_site_care.services import watch_service as watch_service_module
+from devleadhunter_site_care.services.open_map import (
+    ListedBusiness,
+    OpenMapAnswer,
+    OpenMapDirectory,
+    TownLocator,
+)
 from devleadhunter_site_care.services.site_reader import SiteReading
 from devleadhunter_site_care.services.wordpress_releases import WordPressReleases
 
@@ -56,6 +63,30 @@ def wordpress_org_offline(monkeypatch: pytest.MonkeyPatch) -> None:
         return (7, 1)
 
     monkeypatch.setattr(WordPressReleases, "current_branch", current_branch)
+
+
+@pytest.fixture(autouse=True)
+def open_map_answers(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    """
+    OpenStreetMap and the list of communes are never asked.
+
+    Returns:
+        What the open map answers per département code, filled by a test; a département missing here has no
+        business. A point is placed in no commune unless a test says otherwise.
+    """
+    answer_by_department: dict[str, str] = {}
+
+    async def businesses_of(
+        _self: OpenMapDirectory, department: str, families: list[BusinessFamily]
+    ) -> list[ListedBusiness]:
+        return OpenMapAnswer.businesses_of(answer_by_department.get(department, ""), families)
+
+    async def town_at(_self: TownLocator, _latitude: float, _longitude: float) -> str | None:
+        return None
+
+    monkeypatch.setattr(OpenMapDirectory, "businesses_of", businesses_of)
+    monkeypatch.setattr(TownLocator, "town_at", town_at)
+    return answer_by_department
 
 
 @pytest.fixture

@@ -37,10 +37,25 @@
         <UiStatCard label="Écrits" :value="siteList.counts.written" icon="i-lucide-send" />
       </section>
 
-      <p v-if="searchProgressLabel" class="flex items-center gap-2 text-sm text-[var(--app-ink-soft)]" role="status">
-        <UIcon name="i-lucide-loader-circle" class="h-4 w-4 shrink-0 animate-spin" />
-        {{ searchProgressLabel }}
-      </p>
+      <div v-if="searchProgressLabel" class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p class="flex min-w-0 items-center gap-2 text-sm text-[var(--app-ink-soft)]" role="status">
+          <UIcon name="i-lucide-loader-circle" class="h-4 w-4 shrink-0 animate-spin" />
+          {{ searchProgressLabel }}
+        </p>
+        <button
+          type="button"
+          class="btn-secondary h-9 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:h-11"
+          :disabled="isStoppingSearch"
+          @click="stopSearch"
+        >
+          <UIcon
+            :name="isStoppingSearch ? 'i-lucide-loader-circle' : 'i-lucide-square'"
+            class="h-3.5 w-3.5"
+            :class="{ 'animate-spin': isStoppingSearch }"
+          />
+          Arrêter
+        </button>
+      </div>
       <p v-else-if="lastSearchNote" class="text-sm text-[var(--app-ink-soft)]">{{ lastSearchNote }}</p>
 
       <UiEmptyState
@@ -250,6 +265,7 @@ const issueKindFilter: Ref<string> = ref(parseIssueKind(firstQueryValue(route.qu
 const searchText: Ref<string> = ref('')
 const appliedSearchText: Ref<string> = ref('')
 const currentSearch: Ref<SiteCareSearch | null> = ref(null)
+const isStoppingSearch: Ref<boolean> = ref(false)
 
 let latestSiteRequestNumber: number = 0
 let searchTextTimer: ReturnType<typeof setTimeout> | null = null
@@ -286,8 +302,7 @@ const searchProgressLabel: ComputedRef<string | null> = computed((): string | nu
   if (search === null || !isSearchRunning.value) {
     return null
   }
-  const checkedSitesWording: string = search.checked_count > 1 ? 'sites regardés' : 'site regardé'
-  return `Recherche en cours : ${search.checked_count} ${checkedSitesWording} sur ${search.requested_count}`
+  return `Recherche en cours · ${search.zone_label} · ${search.progress_label}`
 })
 
 const lastSearchNote: ComputedRef<string | null> = computed((): string | null => {
@@ -472,6 +487,23 @@ async function refreshSearchProgress(): Promise<void> {
     currentSearch.value = await SiteCareService.getCurrentSearch()
   } catch {
     // The progress line keeps its last figures: the next refresh reads them again.
+  }
+}
+
+/**
+ * Stop the search under way: what it already brought stays in the list, which is read again.
+ * @returns A promise resolved once the search is stopped, or the failure is shown; a failure leaves it running.
+ */
+async function stopSearch(): Promise<void> {
+  isStoppingSearch.value = true
+  try {
+    currentSearch.value = await SiteCareService.stopCurrentSearch()
+    stopSearchProgressRefresh()
+    await refreshSites()
+  } catch {
+    toast.error('La recherche n’a pas pu être arrêtée.')
+  } finally {
+    isStoppingSearch.value = false
   }
 }
 

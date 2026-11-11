@@ -2,7 +2,7 @@
   "name": "devleadhunter-module-site-care-web",
   "private": true,
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Nuxt layer of the site care module of DevLeadHunter, extended by the core's web app",
   "main": "./nuxt.config.ts"
 }

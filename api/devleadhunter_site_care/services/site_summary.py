@@ -15,6 +15,7 @@ from devleadhunter_site_care.catalog import (
     KIND_LABELS,
     KIND_WORDS,
     POINT_BY_KEY,
+    SECURITY_POINT_KEYS,
     WATCH_LEAD_ORDER,
     WATCH_POINTS_WORTH_A_MESSAGE,
     CorrectionKey,
@@ -83,6 +84,14 @@ class SiteSummary:
         if self.lead is not None and self.lead.kind is not None:
             return self.lead.kind
         return IssueKind.OK if self.status == SiteStatus.NOTHING else IssueKind.REVIEW
+
+    @property
+    def has_security_issue(self) -> bool:
+        """Whether a point to fix or to watch is a security matter: a hack, the padlock, PHP, a site software left behind."""
+        return any(
+            point.key in SECURITY_POINT_KEYS or (point.key == PointKey.CMS and point.state == PointState.FIX)
+            for point in (*self.fixes, *self.watches)
+        )
 
     @property
     def lead_kind_label(self) -> str:

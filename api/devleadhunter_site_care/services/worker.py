@@ -16,7 +16,8 @@ class SiteCareWorker:
     """
     Works while the module is switched on: the core starts :meth:`run_forever` and cancels it with the switch.
 
-    A search is worked on batch after batch without a pause; once none is waiting, a few old checks are refreshed.
+    A search is worked on batch after batch without a pause; once none is waiting, a few old checks are refreshed
+    and a few towns the open map left unnamed are looked up.
     """
 
     _IDLE_SECONDS: ClassVar[float] = 20.0
@@ -39,6 +40,7 @@ class SiteCareWorker:
             if await search_service.run_next_batch():
                 return True
             await watch_service.recheck_due_sites()
+            await search_service.name_missing_towns()
         except Exception:
             logger.exception("[SiteCare] background pass failed")
         return False

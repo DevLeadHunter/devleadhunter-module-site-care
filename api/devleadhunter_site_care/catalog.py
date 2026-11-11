@@ -89,6 +89,31 @@ class WritingTrigger(StrEnum):
     WATCH = "watch"
 
 
+class SearchSource(StrEnum):
+    """Where a search finds its businesses."""
+
+    OWN_BASE = "base"
+    OPEN_MAP = "open_map"
+
+
+class BusinessFamily(StrEnum):
+    """A family of businesses the open map lists."""
+
+    CRAFT = "craft"
+    SHOP = "shop"
+    OFFICE = "office"
+    FOOD = "food"
+    LODGING = "lodging"
+
+
+class KeepRule(StrEnum):
+    """Which of the sites a search read enter « Mes prospects »."""
+
+    EVERY_SITE = "all"
+    ANY_ISSUE = "issues"
+    SECURITY_ISSUE = "security"
+
+
 @dataclass(frozen=True)
 class PointDefinition:
     """
@@ -295,3 +320,45 @@ NOT_AN_OWN_SITE_HOSTS: tuple[str, ...] = (
     "youtube.",
     "tiktok.",
 )
+
+SEARCH_SOURCE_LABELS: dict[SearchSource, str] = {
+    SearchSource.OWN_BASE: "Ma base",
+    SearchSource.OPEN_MAP: "OpenStreetMap",
+}
+SEARCH_SOURCE_HINTS: dict[SearchSource, str] = {
+    SearchSource.OWN_BASE: (
+        "Les entreprises que vos recherches du module Sites web ont écartées parce qu’elles ont déjà un site."
+    ),
+    SearchSource.OPEN_MAP: (
+        "Toutes les entreprises d’un département qui ont un site : artisans, commerces, bureaux, restaurants, "
+        "hébergements."
+    ),
+}
+BUSINESS_FAMILY_LABELS: dict[BusinessFamily, str] = {
+    BusinessFamily.CRAFT: "Artisans",
+    BusinessFamily.SHOP: "Commerces",
+    BusinessFamily.OFFICE: "Bureaux et services",
+    BusinessFamily.FOOD: "Restaurants et cafés",
+    BusinessFamily.LODGING: "Hébergements",
+}
+KEEP_RULE_LABELS: dict[KeepRule, str] = {
+    KeepRule.SECURITY_ISSUE: "Les sites qui ont un souci de sécurité",
+    KeepRule.ANY_ISSUE: "Les sites qui ont un souci, quel qu’il soit",
+    KeepRule.EVERY_SITE: "Tous les sites",
+}
+KEEP_RULE_HINTS: dict[KeepRule, str] = {
+    KeepRule.SECURITY_ISSUE: (
+        "Site piraté, pas de cadenas, PHP ou WordPress qui n’est plus suivi, ou dont le suivi s’arrête bientôt."
+    ),
+    KeepRule.ANY_ISSUE: "Tous les sites à qui il y a quelque chose à écrire.",
+    KeepRule.EVERY_SITE: "Chaque site lu entre dans la liste, même sans rien à signaler.",
+}
+SECURITY_POINT_KEYS: frozenset[PointKey] = frozenset({PointKey.HACKED, PointKey.HTTPS, PointKey.PHP})
+ACTIVE_SEARCH_STATUSES: tuple[str, ...] = ("pending", "running")
+COUNTRY_LABELS: dict[str, str] = {
+    "FR": "France",
+    "CH": "Suisse",
+    "BE": "Belgique",
+    "CA": "Québec",
+    "LU": "Luxembourg",
+}

@@ -88,8 +88,8 @@ export class SiteCareService {
   }
 
   /**
-   * Read what a search can target: the countries and the trades, each with how many businesses are available.
-   * @returns The countries and the trades.
+   * Read what a search can target, in the user's base and on OpenStreetMap.
+   * @returns The choices of both sources.
    */
   static getSearchOptions(): Promise<SiteCareSearchOptions> {
     return ApiClient.get<SiteCareSearchOptions>(`${SITE_CARE_API_BASE}/search-options`)
@@ -97,7 +97,7 @@ export class SiteCareService {
 
   /**
    * Launch a search.
-   * @param payload - The trades, the country, the cities and how many prospects are wanted.
+   * @param payload - Where to search, what for and how many prospects are wanted.
    * @returns The search, as it starts.
    * @throws Error carrying the reason when a search is already running (409).
    */
@@ -111,6 +111,18 @@ export class SiteCareService {
    */
   static async getCurrentSearch(): Promise<SiteCareSearch | null> {
     const search: SiteCareSearch | null | undefined = await ApiClient.get(`${SITE_CARE_API_BASE}/searches/current`)
+    return search ?? null
+  }
+
+  /**
+   * Stop the search under way; the prospects it already brought stay in the list.
+   * @returns The stopped search, or null when none was ever launched.
+   */
+  static async stopCurrentSearch(): Promise<SiteCareSearch | null> {
+    const search: SiteCareSearch | null | undefined = await ApiClient.post(
+      `${SITE_CARE_API_BASE}/searches/current/stop`,
+      {},
+    )
     return search ?? null
   }
 

@@ -253,32 +253,62 @@ type SiteListResponse = {
 | Méthode et chemin | Corps | Réponse |
 | --- | --- | --- |
 | `GET /site-care/search-options` | | `SearchOptions` |
-| `POST /site-care/searches` | `SearchCreateBody` | `Search` ; 409 quand une recherche tourne déjà |
+| `POST /site-care/searches` | `SearchCreateBody` | `Search` ; 409 quand une recherche tourne déjà ou qu'OpenStreetMap est demandé sans département ; 422 pour un département, une famille ou un choix inconnu |
 | `GET /site-care/searches/current` | | `Search` ou `null` (la recherche en cours, sinon la dernière) |
+| `POST /site-care/searches/current/stop` | | `Search` ou `null` : la recherche en cours est arrêtée, ce qu'elle a gardé reste dans la liste |
+
+Une recherche a une source : `base` (les entreprises que les recherches du cœur ont écartées parce qu'elles ont un
+site) ou `open_map` (les entreprises qu'OpenStreetMap liste avec un site, par département). Dans la base, tout site lu
+entre dans la liste. Sur OpenStreetMap, `keep_rule` dit lesquels entrent, et `count` est le nombre de sites gardés au plus.
 
 ```ts
+type LabelledChoice = { key: string; label: string; hint: string | null }
+
 type SearchOptions = {
-  countries: { code: string; label: string; available_count: number }[]
-  trades: { key: string; label: string; available_by_country: Record<string, number> }[] // par code de pays
+  sources: LabelledChoice[] // base, open_map ; `hint` dit d'où viennent les entreprises
+  countries: { code: string; label: string; available_count: number }[] // la base
+  trades: { key: string; label: string; available_by_country: Record<string, number> }[] // la base, par code de pays
+  max_count: number // la base : 300
+  open_map: {
+    departments: LabelledChoice[] // les 96 départements de métropole et de Corse
+    families: LabelledChoice[] // craft, shop, office, food, lodging
+    keep_rules: LabelledChoice[] // security, issues, all ; `hint` explique chacun
+    max_count: number // 2000
+    max_departments: number // 20
+    credit: string // la ligne que la licence des données demande d'afficher
+  }
 }
 
-type SearchCreateBody = {
-  trades: string[] // vide = tous les métiers
-  country: string
-  cities: string[] // vide = toutes les villes du pays
-  count: number // de 1 à 300
-}
+type SearchCreateBody =
+  | {
+      source?: 'base' // par défaut
+      trades: string[] // vide = tous les métiers
+      country: string
+      cities: string[] // vide = toutes les villes du pays
+      count: number // de 1 à 300
+    }
+  | {
+      source: 'open_map'
+      departments: string[] // codes (« 35 », « 2A »), 20 au plus
+      families: string[] // vide = toutes les familles
+      keep_rule: 'all' | 'issues' | 'security'
+      count: number // sites gardés au plus, de 1 à 2000
+    }
 
 type Search = {
   id: number
   status: 'pending' | 'running' | 'completed' | 'failed'
   status_label: string
+  source: 'base' | 'open_map'
+  source_label: string
+  keep_rule_label: string
   requested_count: number
-  checked_count: number
-  imported_count: number
-  trades_label: string
+  checked_count: number // sites lus
+  imported_count: number // sites entrés dans la liste
+  progress_label: string // l'avancement en mots
+  trades_label: string // les métiers de la base, ou les familles d'OpenStreetMap
   zone_label: string
-  note: string | null // pourquoi la recherche a ramené moins d'entreprises, ou pourquoi elle a échoué
+  note: string | null // pourquoi la recherche a ramené moins de sites, a été arrêtée ou a échoué
   created_at: string
   completed_at: string | null
 }
@@ -287,14 +317,27 @@ type Search = {
 ```json
 // SearchOptions
 {
+  "sources": [ { "key": "open_map", "label": "OpenStreetMap", "hint": "Toutes les entreprises d’un département qui ont un site : artisans, commerces, bureaux, restaurants, hébergements." } ],
   "countries": [ { "code": "FR", "label": "France", "available_count": 1153 } ],
-  "trades": [ { "key": "paysagiste", "label": "Paysagiste", "available_by_country": { "FR": 512, "CH": 340 } } ]
+  "trades": [ { "key": "paysagiste", "label": "Paysagiste", "available_by_country": { "FR": 512, "CH": 340 } } ],
+  "max_count": 300,
+  "open_map": {
+    "departments": [ { "key": "35", "label": "Ille-et-Vilaine (35)", "hint": null } ],
+    "families": [ { "key": "craft", "label": "Artisans", "hint": null } ],
+    "keep_rules": [ { "key": "security", "label": "Les sites qui ont un souci de sécurité", "hint": "Site piraté, pas de cadenas, PHP ou WordPress qui n’est plus suivi, ou dont le suivi s’arrête bientôt." } ],
+    "max_count": 2000,
+    "max_departments": 20,
+    "credit": "Données © les contributeurs d’OpenStreetMap, sous licence ODbL."
+  }
 }
 // SearchCreateBody
 { "trades": ["paysagiste"], "country": "FR", "cities": ["Reims"], "count": 50 }
+{ "source": "open_map", "departments": ["35", "22"], "families": [], "keep_rule": "security", "count": 300 }
 // Search
-{ "id": 4, "status": "running", "status_label": "En cours", "requested_count": 50, "checked_count": 12, "imported_count": 11,
-  "trades_label": "Paysagiste, Garage", "zone_label": "France", "note": null, "created_at": "2026-11-11T16:00:00", "completed_at": null }
+{ "id": 4, "status": "running", "status_label": "En cours", "source": "open_map", "source_label": "OpenStreetMap",
+  "keep_rule_label": "Les sites qui ont un souci de sécurité", "requested_count": 300, "checked_count": 1240, "imported_count": 86,
+  "progress_label": "1240 sites lus, 86 gardés sur 300 demandés", "trades_label": "Toutes les entreprises",
+  "zone_label": "Ille-et-Vilaine (35), Côtes-d’Armor (22)", "note": null, "created_at": "2026-11-11T16:00:00", "completed_at": null }
 ```
 
 ### Veille

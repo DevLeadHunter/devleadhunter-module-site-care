@@ -23,7 +23,11 @@ import dns.resolver
 import httpx
 
 from core.clock import naive_utc_now
+from services.prospect_search.trade_catalog import TradeCatalog, TradeProfile
 from services.public_url_guard import PublicOnlyAsyncTransport
+from services.website_liveness_service import WebsiteLivenessService
+
+from devleadhunter_site_care.catalog import NOT_AN_OWN_SITE_HOSTS
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +164,32 @@ class SiteAddress:
         labels: list[str] = SiteAddress.bare_host(host).split(".")
         return ".".join(labels[-2:]) if len(labels) > 2 else ".".join(labels)
 
+    @staticmethod
+    def is_own_site(
+        website: str, host: str, business_name: str, typed_trade: str, google_category: str | None = None
+    ) -> bool:
+        """
+        Whether an address is the business's own site.
+
+        Args:
+            website: The site's address.
+            host: Its host without « www. ».
+            business_name: The business.
+            typed_trade: Its trade, as the source names it.
+            google_category: The category of its Google listing, when it has one.
+
+        Returns:
+            False for a page on someone else's platform, a directory's mini-site or a network's outlet.
+        """
+        if any(marker in host for marker in NOT_AN_OWN_SITE_HOSTS):
+            return False
+        if WebsiteLivenessService.is_placeholder_host(WebsiteLivenessService.normalize_url(website)):
+            return False
+        profile: TradeProfile = TradeCatalog.resolve(typed_trade)
+        return (
+            profile.brand_of_site(website) is None and profile.brand_outlet_of(business_name, google_category) is None
+        )
+
 
 class HomePageFacts:
     """Reads the facts of a home page out of its HTML."""
@@ -225,6 +255,8 @@ class HomePageFacts:
             r"\bbahis\b",
             r"\btogel\b",
             r"\bslot\s*gacor\b",
+            r"\bslot\s+online\b",
+            r"\bsitus\s+(?:slot|judi)\b",
             r"\bjudi\s+(?:online|slot|bola)\b",
             r"\bdeneme\s+bonusu\b",
             r"\bsbobet\b",
@@ -234,6 +266,7 @@ class HomePageFacts:
             r"\bbonus\s+veren\b",
         )
     )
+    _EMAIL_ADDRESS: ClassVar[str] = r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
     _IGNORED_EMAIL_MARKS: ClassVar[tuple[str, ...]] = ("sentry", "wixpress", "example", "domaine.", "votre-", "nom@")
     _IMAGE_SUFFIXES: ClassVar[tuple[str, ...]] = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")
     _CONTACT_LINK_WORDS: ClassVar[tuple[str, ...]] = ("contact", "mentions", "legal", "impressum")
@@ -306,16 +339,26 @@ class HomePageFacts:
         """
         mailto: list[str] = re.findall(r'href=["\']mailto:([^"\'?]+)', html, flags=re.IGNORECASE)
         found: set[str] = {
-            match.lower().strip(".")
-            for match in re.findall(
-                r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", visible + " " + " ".join(mailto)
-            )
+            match.lower().strip(".") for match in re.findall(cls._EMAIL_ADDRESS, visible + " " + " ".join(mailto))
         }
         return sorted(
             email
             for email in found
             if not email.endswith(cls._IMAGE_SUFFIXES) and not any(mark in email for mark in cls._IGNORED_EMAIL_MARKS)
         )[:6]
+
+    @classmethod
+    def is_email_address(cls, text: str) -> bool:
+        """
+        Whether a text is one email address and nothing else.
+
+        Args:
+            text: What was typed, or what a source gives as an address.
+
+        Returns:
+            True for a single well-formed address.
+        """
+        return re.fullmatch(cls._EMAIL_ADDRESS, text) is not None
 
     @classmethod
     def outside_gambling_links(cls, html: str, host: str) -> list[str]:

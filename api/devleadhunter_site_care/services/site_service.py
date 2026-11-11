@@ -30,11 +30,24 @@ from devleadhunter_site_care.services.wordpress_releases import wordpress_releas
 
 _UNREAD_STATUSES: tuple[str, ...] = (SiteStatus.UNREACHABLE.value, SiteStatus.UNREADABLE.value)
 _NO_LEAD_RANK: int = 999
-_EMAIL_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 
 class SiteCareError(ValueError):
     """Something the owner asked for cannot be done; the message says why, in French."""
+
+
+@dataclass(frozen=True)
+class SiteCheck:
+    """
+    What a reading says of a site.
+
+    Attributes:
+        points: The site's twelve points.
+        summary: Their summary, with the owner's writing rules.
+    """
+
+    points: list[SitePoint]
+    summary: SiteSummary
 
 
 @dataclass
@@ -190,6 +203,32 @@ class SiteService:
             was_read=site.status not in _UNREAD_STATUSES,
         )
 
+    async def check_of(
+        self, reading: SiteReading, settings: OwnerSettings, *, google_listing_phone: str | None
+    ) -> SiteCheck:
+        """
+        What a reading says of a site, without storing anything.
+
+        Args:
+            reading: What was just read.
+            settings: The owner's settings.
+            google_listing_phone: The number of the business's Google listing, None when it has none.
+
+        Returns:
+            The twelve points and their summary.
+        """
+        points: list[SitePoint] = SitePointReader(
+            today=reading.read_at.date(),
+            wordpress_branch=await wordpress_releases.current_branch(),
+            listing_phone=google_listing_phone,
+        ).points_of(reading)
+        return SiteCheck(
+            points=points,
+            summary=SiteSummarizer.summarize(
+                points, settings.writing_rules, was_reached=reading.was_reached, was_read=reading.was_read
+            ),
+        )
+
     async def apply_reading(
         self, db: Session, site: SiteCareSite, reading: SiteReading, settings: OwnerSettings
     ) -> SiteSummary:
@@ -205,34 +244,53 @@ class SiteService:
         Returns:
             The check, summed up.
         """
+        check: SiteCheck = await self.check_of(
+            reading, settings, google_listing_phone=self.google_listing_phone_of(site.phone, site.candidate_id)
+        )
+        self.apply_check(db, site, reading, check)
+        return check.summary
+
+    def apply_check(self, db: Session, site: SiteCareSite, reading: SiteReading, check: SiteCheck) -> None:
+        """
+        Store a check on a site, and note what changed since the previous one (the caller commits).
+
+        Args:
+            db: Active database session.
+            site: The site, new or already stored.
+            reading: What was read.
+            check: What the reading says.
+        """
         previous_states: dict[str, str] = {point["key"]: point["state"] for point in site.points or []}
         was_reached_before: bool = bool(site.points) and site.status != SiteStatus.UNREACHABLE.value
         is_first_check: bool = not site.points
-        points: list[SitePoint] = SitePointReader(
-            today=reading.read_at.date(),
-            wordpress_branch=await wordpress_releases.current_branch(),
-            listing_phone=site.phone,
-        ).points_of(reading)
-        summary: SiteSummary = SiteSummarizer.summarize(
-            points, settings.writing_rules, was_reached=reading.was_reached, was_read=reading.was_read
-        )
-        site.points = [point.to_json() for point in points]
+        site.points = [point.to_json() for point in check.points]
         site.reading = reading.to_json()
         site.checked_at = reading.read_at
-        self._store_summary(site, summary)
-        if site.email is None:
-            found: str | None = self.best_email(reading.emails, site.host)
-            if found is not None:
-                site.email, site.email_source = found, "site"
+        self._store_summary(site, check.summary)
+        self.adopt_email(site, reading.emails)
         self._note_changes(
             db,
             site,
-            points,
+            check.points,
             previous_states,
             is_first_check=is_first_check,
             stopped_answering=not reading.was_reached and (is_first_check or was_reached_before),
         )
-        return summary
+
+    @staticmethod
+    def google_listing_phone_of(phone: str | None, candidate_id: int | None) -> str | None:
+        """
+        The number of a business's Google listing, the one its home page is compared with.
+
+        Args:
+            phone: The business's number, as its source gives it.
+            candidate_id: The core candidate the business comes from, when a core search found it.
+
+        Returns:
+            The number when the business comes from a Google listing (a core search), None when its number comes
+            from elsewhere: the open map's number says nothing of the listing.
+        """
+        return phone if candidate_id is not None else None
 
     def apply_rules_to_all(self, db: Session, user_id: int, rules: WritingRules) -> None:
         """
@@ -290,11 +348,27 @@ class SiteService:
             if self.best_email(emails, host) is None and reading.contact_page_urls:
                 emails += await reader.read_emails_of_pages(reading.contact_page_urls)
         db.refresh(site)
-        found: str | None = self.best_email(emails, host)
+        has_found_one: bool = self.adopt_email(site, emails)
+        db.commit()
+        return has_found_one
+
+    def adopt_email(self, site: SiteCareSite, emails: list[str]) -> bool:
+        """
+        Give a site without an address the business's own, among those read on its pages (the caller commits).
+
+        Args:
+            site: The site.
+            emails: The addresses read on the site's pages.
+
+        Returns:
+            True when the site took one; a site that already has an address keeps it.
+        """
+        if site.email is not None:
+            return False
+        found: str | None = self.best_email(emails, site.host)
         if found is None:
             return False
         site.email, site.email_source = found, "site"
-        db.commit()
         return True
 
     def set_email(self, db: Session, site: SiteCareSite, email: str) -> None:
@@ -310,7 +384,7 @@ class SiteService:
             SiteCareError: The text is not an email address.
         """
         cleaned: str = email.strip().lower()
-        if cleaned and not _EMAIL_PATTERN.match(cleaned):
+        if cleaned and not HomePageFacts.is_email_address(cleaned):
             raise SiteCareError("Cette adresse e-mail n’est pas valide.")
         site.email, site.email_source = (cleaned, "manual") if cleaned else (None, None)
         db.commit()

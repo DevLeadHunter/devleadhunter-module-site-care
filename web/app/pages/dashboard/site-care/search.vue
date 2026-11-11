@@ -31,44 +31,70 @@
 
       <div class="flex min-w-0 flex-1 flex-col">
         <div v-if="currentStep === 1" class="wizard-step space-y-5 pb-20">
+          <div class="app-card space-y-3 p-5 @2xl:p-6">
+            <h2 id="site-care-search-source-title" class="text-base font-semibold text-[var(--app-ink)]">
+              Où chercher
+            </h2>
+            <UiRadioCardGroup
+              v-model="selectedSource"
+              :options="sourceOptions"
+              labelled-by="site-care-search-source-title"
+              class="@2xl:grid-cols-2"
+            />
+          </div>
+
           <div class="app-card space-y-5 p-5 @2xl:p-6">
-            <div>
-              <h2 id="site-care-search-trades-title" class="text-base font-semibold text-[var(--app-ink)]">
-                Métiers recherchés
-              </h2>
-              <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-                Cochez autant de métiers que vous voulez. Sans métier coché, la recherche prend toutes les entreprises
-                de la zone.
-              </p>
-            </div>
+            <template v-if="isSearchingOpenMap">
+              <div>
+                <h2 class="text-base font-semibold text-[var(--app-ink)]">Types d’entreprises</h2>
+                <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
+                  Cochez les types qui vous intéressent. Sans rien cocher, la recherche prend toutes les entreprises.
+                  Les enseignes et les réseaux sont laissés de côté.
+                </p>
+              </div>
 
-            <div class="flex flex-wrap gap-2" role="group" aria-labelledby="site-care-search-trades-title">
-              <button
-                v-for="trade in tradeChoices"
-                :key="trade.key"
-                type="button"
-                :class="choiceChipClass(trade.isSelected)"
-                :aria-pressed="trade.isSelected"
-                :disabled="trade.availableCount === 0"
-                @click="toggleTrade(trade.key)"
-              >
-                {{ trade.label }}
-                <span class="font-[family-name:var(--app-font-mono)] text-xs opacity-70">
-                  {{ trade.availableCount }}
-                </span>
-              </button>
-            </div>
+              <UiChipToggleGroup v-model="selectedFamilyKeys" :options="familyOptions" label="Types d’entreprises" />
+            </template>
 
-            <div class="space-y-1.5 text-[13px] leading-relaxed text-[var(--app-ink-soft)]">
-              <p v-if="selectedCountry">
-                Le nombre à côté de chaque métier compte les entreprises disponibles. Pays choisi :
-                {{ selectedCountry.label }}.
-              </p>
-              <p>
-                Un métier manque ? Lancez une recherche du module Sites web sur ce métier : les entreprises qui ont déjà
-                un site arrivent ici.
-              </p>
-            </div>
+            <template v-else>
+              <div>
+                <h2 id="site-care-search-trades-title" class="text-base font-semibold text-[var(--app-ink)]">
+                  Métiers recherchés
+                </h2>
+                <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
+                  Cochez autant de métiers que vous voulez. Sans métier coché, la recherche prend toutes les entreprises
+                  de la zone.
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-2" role="group" aria-labelledby="site-care-search-trades-title">
+                <button
+                  v-for="trade in tradeChoices"
+                  :key="trade.key"
+                  type="button"
+                  :class="choiceChipClass(trade.isSelected)"
+                  :aria-pressed="trade.isSelected"
+                  :disabled="trade.availableCount === 0"
+                  @click="toggleTrade(trade.key)"
+                >
+                  {{ trade.label }}
+                  <span class="font-[family-name:var(--app-font-mono)] text-xs opacity-70">
+                    {{ trade.availableCount }}
+                  </span>
+                </button>
+              </div>
+
+              <div class="space-y-1.5 text-[13px] leading-relaxed text-[var(--app-ink-soft)]">
+                <p v-if="selectedCountry">
+                  Le nombre à côté de chaque métier compte les entreprises disponibles. Pays choisi :
+                  {{ selectedCountry.label }}.
+                </p>
+                <p>
+                  Un métier manque ? Lancez une recherche du module Sites web sur ce métier : les entreprises qui ont
+                  déjà un site arrivent ici.
+                </p>
+              </div>
+            </template>
 
             <div class="border-t border-[var(--app-line-soft)] pt-5">
               <label for="site-care-search-count" class="app-label mb-1.5 block">Nombre de prospects</label>
@@ -79,6 +105,7 @@
                   type="number"
                   inputmode="numeric"
                   min="1"
+                  :max="maximumWantedProspectCount"
                   step="1"
                   class="app-input w-28"
                 />
@@ -88,8 +115,23 @@
           </div>
         </div>
 
-        <div v-else-if="currentStep === 2" class="wizard-step space-y-5 pb-20">
-          <div class="app-card space-y-5 p-5 @2xl:p-6">
+        <div v-else-if="currentStep === ZONE_STEP_ID" class="wizard-step space-y-5 pb-20">
+          <div v-if="isSearchingOpenMap" class="app-card space-y-4 p-5 @2xl:p-6">
+            <div>
+              <h2 class="text-base font-semibold text-[var(--app-ink)]">Départements</h2>
+              <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
+                {{ searchOptions.open_map.max_departments }} départements au plus. La recherche lit les sites d’un
+                département avant de passer au suivant.
+              </p>
+            </div>
+            <SiteCareDepartmentPicker
+              v-model="selectedDepartmentCodes"
+              :departments="searchOptions.open_map.departments"
+              :maximum-count="searchOptions.open_map.max_departments"
+            />
+          </div>
+
+          <div v-else class="app-card space-y-5 p-5 @2xl:p-6">
             <div>
               <h2 id="site-care-search-country-title" class="text-base font-semibold text-[var(--app-ink)]">Pays</h2>
               <div class="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-labelledby="site-care-search-country-title">
@@ -153,6 +195,21 @@
         </div>
 
         <div v-else-if="currentStep === 3" class="wizard-step space-y-5 pb-20">
+          <div v-if="isSearchingOpenMap" class="app-card space-y-3 p-5 @2xl:p-6">
+            <h2 id="site-care-search-keep-title" class="text-base font-semibold text-[var(--app-ink)]">
+              Sites à garder
+            </h2>
+            <UiRadioCardGroup
+              v-model="selectedKeepRule"
+              :options="keepRuleOptions"
+              labelled-by="site-care-search-keep-title"
+              class="@3xl:grid-cols-3"
+            />
+            <p class="text-[13px] leading-relaxed text-[var(--app-ink-soft)]">
+              Un site lu n’est jamais relu par une recherche suivante, qu’il ait été gardé ou non.
+            </p>
+          </div>
+
           <div class="app-card space-y-5 p-5 @2xl:p-6">
             <div>
               <h2 id="site-care-search-channel-title" class="text-base font-semibold text-[var(--app-ink)]">
@@ -218,9 +275,14 @@
               </div>
             </dl>
             <p class="text-sm text-[var(--app-ink-soft)]">Les entreprises déjà connues ne sont jamais reprises.</p>
-            <p v-if="hasNoAvailableBusiness" class="text-sm text-[var(--app-red)]">
-              Aucune entreprise disponible pour ces critères.
-            </p>
+            <template v-if="isSearchingOpenMap">
+              <p class="text-sm text-[var(--app-ink-soft)]">
+                La recherche lit chaque site de la zone : comptez de 20 à 40 minutes par département. Elle tourne toute
+                seule et s’arrête depuis « Mes prospects ».
+              </p>
+              <p class="text-xs text-[var(--app-faint)]">{{ searchOptions.open_map.credit }}</p>
+            </template>
+            <p v-if="launchBlockerMessage" class="text-sm text-[var(--app-red)]">{{ launchBlockerMessage }}</p>
             <p v-if="launchFailureMessage" class="text-sm leading-relaxed text-[var(--app-red)]" role="alert">
               {{ launchFailureMessage }}
             </p>
@@ -293,11 +355,17 @@
 <script lang="ts" setup>
 import type { ComputedRef, Ref } from 'vue'
 import type { UseDashboardScrollReturn } from '~/types/Composables'
+import type { SelectFieldOption } from '~/types/SelectField'
+import type { UiRadioCardOption } from '~/types/UiRadioCardGroup'
 import type { UiWizardStep } from '~/types/UiWizardStepper'
 import type {
   SiteCareSearch,
   SiteCareSearchCountryOption,
+  SiteCareSearchCreatePayload,
+  SiteCareSearchKeepRule,
+  SiteCareSearchLabelledChoice,
   SiteCareSearchOptions,
+  SiteCareSearchSource,
   SiteCareSearchTradeOption,
 } from '../../../types/SiteCareSearch'
 import type {
@@ -305,7 +373,7 @@ import type {
   SiteCareSearchRecapRow,
   SiteCareSearchTradeChoice,
 } from '../../../types/SiteCareSearchPage'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useDashboardScroll } from '~/composables/useDashboardScroll'
 import { SITE_CARE_SECTION_PATH } from '../../../constants/siteCareModule'
 import { SiteCareService } from '../../../services/siteCareService'
@@ -316,14 +384,28 @@ useSeoMeta({ title: 'Nouvelle recherche · DevLeadHunter' })
 
 const { scrollToTop }: UseDashboardScrollReturn = useDashboardScroll()
 
+const ZONE_STEP_ID: number = 2
+
 const SEARCH_STEPS: UiWizardStep[] = [
   { id: 1, label: 'Cible' },
-  { id: 2, label: 'Zone' },
+  { id: ZONE_STEP_ID, label: 'Zone' },
   { id: 3, label: 'Critères' },
   { id: 4, label: 'Lancer' },
 ]
 
 const DEFAULT_WANTED_PROSPECT_COUNT: number = 50
+const DEFAULT_OPEN_MAP_WANTED_PROSPECT_COUNT: number = 300
+
+const SEARCH_SOURCE_ICONS: Record<SiteCareSearchSource, string> = {
+  base: 'i-lucide-database',
+  open_map: 'i-lucide-map',
+}
+
+const KEEP_RULE_ICONS: Record<SiteCareSearchKeepRule, string> = {
+  security: 'i-lucide-shield-alert',
+  issues: 'i-lucide-triangle-alert',
+  all: 'i-lucide-list',
+}
 
 const CONTACT_CHANNEL_CHOICES: SiteCareContactChannelChoice[] = [
   {
@@ -348,14 +430,57 @@ const CONTACT_CHANNEL_CHOICES: SiteCareContactChannelChoice[] = [
 const searchOptions: Ref<SiteCareSearchOptions | null> = ref(null)
 const isLoadingOptions: Ref<boolean> = ref(true)
 const currentStep: Ref<number> = ref(1)
+const selectedSource: Ref<SiteCareSearchSource> = ref('base')
 const selectedTradeKeys: Ref<string[]> = ref([])
 const selectedCountryCode: Ref<string | null> = ref(null)
 const cities: Ref<string[]> = ref([])
 const cityInput: Ref<string> = ref('')
+const selectedFamilyKeys: Ref<string[]> = ref([])
+const selectedDepartmentCodes: Ref<string[]> = ref([])
+const selectedKeepRule: Ref<SiteCareSearchKeepRule> = ref('security')
 const wantedProspectCount: Ref<number> = ref(DEFAULT_WANTED_PROSPECT_COUNT)
 const isLaunching: Ref<boolean> = ref(false)
 const launchedSearch: Ref<SiteCareSearch | null> = ref(null)
 const launchFailureMessage: Ref<string | null> = ref(null)
+
+const isSearchingOpenMap: ComputedRef<boolean> = computed((): boolean => selectedSource.value === 'open_map')
+
+const sourceOptions: ComputedRef<UiRadioCardOption<SiteCareSearchSource>[]> = computed(
+  (): UiRadioCardOption<SiteCareSearchSource>[] =>
+    (searchOptions.value?.sources ?? []).map(
+      (source: SiteCareSearchLabelledChoice<SiteCareSearchSource>): UiRadioCardOption<SiteCareSearchSource> => ({
+        value: source.key,
+        label: source.label,
+        description: source.hint ?? '',
+        icon: SEARCH_SOURCE_ICONS[source.key],
+      }),
+    ),
+)
+
+const familyOptions: ComputedRef<SelectFieldOption[]> = computed((): SelectFieldOption[] =>
+  (searchOptions.value?.open_map.families ?? []).map(
+    (family: SiteCareSearchLabelledChoice): SelectFieldOption => ({ value: family.key, label: family.label }),
+  ),
+)
+
+const keepRuleOptions: ComputedRef<UiRadioCardOption<SiteCareSearchKeepRule>[]> = computed(
+  (): UiRadioCardOption<SiteCareSearchKeepRule>[] =>
+    (searchOptions.value?.open_map.keep_rules ?? []).map(
+      (keepRule: SiteCareSearchLabelledChoice<SiteCareSearchKeepRule>): UiRadioCardOption<SiteCareSearchKeepRule> => ({
+        value: keepRule.key,
+        label: keepRule.label,
+        description: keepRule.hint ?? '',
+        icon: KEEP_RULE_ICONS[keepRule.key],
+      }),
+    ),
+)
+
+const maximumWantedProspectCount: ComputedRef<number> = computed((): number => {
+  if (searchOptions.value === null) {
+    return DEFAULT_WANTED_PROSPECT_COUNT
+  }
+  return isSearchingOpenMap.value ? searchOptions.value.open_map.max_count : searchOptions.value.max_count
+})
 
 const selectedCountry: ComputedRef<SiteCareSearchCountryOption | null> = computed(
   (): SiteCareSearchCountryOption | null =>
@@ -380,14 +505,20 @@ const selectedTradeChoices: ComputedRef<SiteCareSearchTradeChoice[]> = computed(
 )
 
 const hasValidWantedProspectCount: ComputedRef<boolean> = computed(
-  (): boolean => Number.isInteger(wantedProspectCount.value) && wantedProspectCount.value >= 1,
+  (): boolean =>
+    Number.isInteger(wantedProspectCount.value) &&
+    wantedProspectCount.value >= 1 &&
+    wantedProspectCount.value <= maximumWantedProspectCount.value,
 )
 
-const wantedProspectCountHint: ComputedRef<string> = computed((): string =>
-  selectedTradeChoices.value.length > 1
+const wantedProspectCountHint: ComputedRef<string> = computed((): string => {
+  if (isSearchingOpenMap.value) {
+    return `au plus (${maximumWantedProspectCount.value} au maximum) : la recherche s’arrête à ce nombre, ou quand toute la zone est lue`
+  }
+  return selectedTradeChoices.value.length > 1
     ? `en tout, répartis entre les ${selectedTradeChoices.value.length} métiers`
-    : 'en tout',
-)
+    : 'en tout'
+})
 
 /** Businesses available for the country and trades chosen; the cities typed are not counted here. */
 const availableBusinessCount: ComputedRef<number> = computed((): number => {
@@ -404,14 +535,55 @@ const availableBusinessCount: ComputedRef<number> = computed((): number => {
   )
 })
 
-const hasNoAvailableBusiness: ComputedRef<boolean> = computed(
-  (): boolean => cities.value.length === 0 && availableBusinessCount.value === 0,
+const launchBlockerMessage: ComputedRef<string | null> = computed((): string | null => {
+  if (isSearchingOpenMap.value) {
+    return selectedDepartmentCodes.value.length === 0 ? 'Choisissez au moins un département, à l’étape Zone.' : null
+  }
+  return cities.value.length === 0 && availableBusinessCount.value === 0
+    ? 'Aucune entreprise disponible pour ces critères.'
+    : null
+})
+
+const selectedSourceLabel: ComputedRef<string> = computed(
+  (): string =>
+    sourceOptions.value.find(
+      (source: UiRadioCardOption<SiteCareSearchSource>): boolean => source.value === selectedSource.value,
+    )?.label ?? '',
 )
 
-const recapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] => {
+const openMapRecapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] => {
+  const selectedFamilyLabels: string[] = labelsOfSelectedChoices(
+    searchOptions.value?.open_map.families ?? [],
+    selectedFamilyKeys.value,
+  )
+  const selectedDepartmentLabels: string[] = labelsOfSelectedChoices(
+    searchOptions.value?.open_map.departments ?? [],
+    selectedDepartmentCodes.value,
+  )
+  return [
+    { label: 'Source', value: selectedSourceLabel.value },
+    {
+      label: 'Entreprises',
+      value: selectedFamilyLabels.length === 0 ? 'Toutes les entreprises' : selectedFamilyLabels.join(', '),
+    },
+    { label: 'Zone', value: selectedDepartmentLabels.join(', ') || 'Aucun département choisi' },
+    {
+      label: 'Sites gardés',
+      value:
+        keepRuleOptions.value.find(
+          (keepRule: UiRadioCardOption<SiteCareSearchKeepRule>): boolean => keepRule.value === selectedKeepRule.value,
+        )?.label ?? '',
+    },
+    { label: 'Nombre', value: `${countedLabel(wantedProspectCount.value, 'prospect', 'prospects')} au plus` },
+    { label: 'Joindre', value: 'Par email' },
+  ]
+})
+
+const ownBaseRecapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] => {
   const countryLabel: string = selectedCountry.value?.label ?? ''
   const hasTypedCities: boolean = cities.value.length > 0
   return [
+    { label: 'Source', value: selectedSourceLabel.value },
     {
       label: 'Métiers',
       value:
@@ -436,13 +608,24 @@ const recapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSe
   ]
 })
 
-const canContinue: ComputedRef<boolean> = computed(
-  (): boolean => hasValidWantedProspectCount.value && selectedCountry.value !== null,
+const recapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] =>
+  isSearchingOpenMap.value ? openMapRecapRows.value : ownBaseRecapRows.value,
 )
+
+const canContinue: ComputedRef<boolean> = computed((): boolean => {
+  if (!hasValidWantedProspectCount.value) {
+    return false
+  }
+
+  if (isSearchingOpenMap.value) {
+    return currentStep.value !== ZONE_STEP_ID || selectedDepartmentCodes.value.length > 0
+  }
+  return selectedCountry.value !== null
+})
 
 const canLaunch: ComputedRef<boolean> = computed(
   (): boolean =>
-    canContinue.value && !hasNoAvailableBusiness.value && !isLaunching.value && launchedSearch.value === null,
+    canContinue.value && launchBlockerMessage.value === null && !isLaunching.value && launchedSearch.value === null,
 )
 
 /**
@@ -503,6 +686,45 @@ function selectCountry(countryCode: string): void {
     .map((trade: SiteCareSearchTradeOption): string => trade.key)
 }
 
+/**
+ * Read the labels of the choices picked, in the order the choices are offered.
+ * @param choices - The choices offered.
+ * @param selectedKeys - The keys of those picked.
+ * @returns The labels of the picked ones.
+ */
+function labelsOfSelectedChoices(choices: SiteCareSearchLabelledChoice[], selectedKeys: string[]): string[] {
+  return choices
+    .filter((choice: SiteCareSearchLabelledChoice): boolean => selectedKeys.includes(choice.key))
+    .map((choice: SiteCareSearchLabelledChoice): string => choice.label)
+}
+
+/**
+ * Write the search asked for, as the API reads it.
+ * @returns The body of the request, or null while the base has no country chosen.
+ */
+function buildSearchPayload(): SiteCareSearchCreatePayload | null {
+  if (isSearchingOpenMap.value) {
+    return {
+      source: 'open_map',
+      departments: selectedDepartmentCodes.value,
+      families: selectedFamilyKeys.value,
+      keep_rule: selectedKeepRule.value,
+      count: wantedProspectCount.value,
+    }
+  }
+
+  if (selectedCountry.value === null) {
+    return null
+  }
+  return {
+    source: 'base',
+    trades: selectedTradeChoices.value.map((trade: SiteCareSearchTradeChoice): string => trade.key),
+    country: selectedCountry.value.code,
+    cities: cities.value,
+    count: wantedProspectCount.value,
+  }
+}
+
 /** Add the city typed to the list, once, then empty the field. */
 function addTypedCity(): void {
   const typedCity: string = cityInput.value.trim()
@@ -541,7 +763,7 @@ function goToStep(step: number): void {
 }
 
 /**
- * Read the countries and trades a search can target, and choose the first country.
+ * Read what a search can target, choose the first country, and start on OpenStreetMap when the base is used up.
  * @returns A promise resolved once the options are shown, or the failure is.
  */
 async function loadSearchOptions(): Promise<void> {
@@ -550,6 +772,7 @@ async function loadSearchOptions(): Promise<void> {
     const options: SiteCareSearchOptions = await SiteCareService.getSearchOptions()
     searchOptions.value = options
     selectedCountryCode.value = options.countries[0]?.code ?? null
+    selectedSource.value = options.countries.length > 0 ? 'base' : 'open_map'
   } catch {
     searchOptions.value = null
   } finally {
@@ -562,19 +785,14 @@ async function loadSearchOptions(): Promise<void> {
  * @returns A promise resolved once the search is launched, or the refusal is shown.
  */
 async function launchSearch(): Promise<void> {
-  const country: SiteCareSearchCountryOption | null = selectedCountry.value
-  if (!canLaunch.value || country === null) {
+  const payload: SiteCareSearchCreatePayload | null = buildSearchPayload()
+  if (!canLaunch.value || payload === null) {
     return
   }
   isLaunching.value = true
   launchFailureMessage.value = null
   try {
-    launchedSearch.value = await SiteCareService.startSearch({
-      trades: selectedTradeChoices.value.map((trade: SiteCareSearchTradeChoice): string => trade.key),
-      country: country.code,
-      cities: cities.value,
-      count: wantedProspectCount.value,
-    })
+    launchedSearch.value = await SiteCareService.startSearch(payload)
   } catch (error: unknown) {
     launchFailureMessage.value = SiteCareService.failureMessage(
       error,
@@ -584,6 +802,11 @@ async function launchSearch(): Promise<void> {
     isLaunching.value = false
   }
 }
+
+watch(selectedSource, (source: SiteCareSearchSource): void => {
+  wantedProspectCount.value =
+    source === 'open_map' ? DEFAULT_OPEN_MAP_WANTED_PROSPECT_COUNT : DEFAULT_WANTED_PROSPECT_COUNT
+})
 
 onMounted(async (): Promise<void> => {
   await loadSearchOptions()

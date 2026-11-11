@@ -6,6 +6,7 @@ does before ``init_db()`` creates the missing tables.
 """
 
 from devleadhunter_site_care.models.care_plan import SiteCarePlan
+from devleadhunter_site_care.models.map_business import SiteCareMapBusiness
 from devleadhunter_site_care.models.owner_settings import SiteCareOwnerSettings
 from devleadhunter_site_care.models.search import SiteCareSearch
 from devleadhunter_site_care.models.sent_message import SiteCareSentMessage
@@ -13,6 +14,7 @@ from devleadhunter_site_care.models.site import SiteCareSite
 from devleadhunter_site_care.models.watch_event import SiteCareWatchEvent
 
 __all__ = [
+    "SiteCareMapBusiness",
     "SiteCareOwnerSettings",
     "SiteCarePlan",
     "SiteCareSearch",

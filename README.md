@@ -17,7 +17,7 @@ vend deux choses : une correction à prix fixe et un suivi mensuel.
 | Écran | Rôle |
 | --- | --- |
 | Mes prospects (`/dashboard/site-care`) | La seule liste du module. Chaque ligne dit le type de souci (Site piraté, Sécurité, Version à risque, Mise à jour en retard, E-mails…), la technologie (« PHP 7.4 ») et le fait en une phrase. La fiche prépare le message et l'envoie. |
-| Nouvelle recherche (`/dashboard/site-care/search`) | Fait entrer des entreprises dans le module, par métier, pays et ville. |
+| Nouvelle recherche (`/dashboard/site-care/search`) | Fait entrer des entreprises dans le module : depuis la base du compte (métier, pays, ville) ou depuis OpenStreetMap (département, type d'entreprise, sites à garder). |
 | Veille (`/dashboard/site-care/watch`) | Ce qui vient de changer sur les sites suivis et les dates qui approchent. |
 | Suivis (`/dashboard/site-care/care-plans`) | Les clients en suivi mensuel et leur rapport du mois. |
 | Réglages (`/dashboard/settings/site-care`) | Prix, quand écrire, points regardés, qui écrit. |
@@ -25,15 +25,32 @@ vend deux choses : une correction à prix fixe et un suivi mensuel.
 
 ### D'où viennent les entreprises
 
-La recherche du cœur écarte une entreprise dès qu'elle a un site en ligne (`prospect_search_candidates`, raison
-`has_website`). Ces entreprises sont déjà nommées, situées, avec leur fiche Google : ce sont elles que la recherche
-du module fait entrer. Un site de réseau, une page Facebook ou un mini-site d'annuaire sont laissés de côté. Chaque
-recherche du module Sites web en apporte de nouvelles.
+Une recherche puise dans l'une de ces deux sources.
+
+**La base du compte.** La recherche du cœur écarte une entreprise dès qu'elle a un site en ligne
+(`prospect_search_candidates`, raison `has_website`). Ces entreprises sont déjà nommées, situées, avec leur fiche
+Google : la recherche du module les fait entrer, toutes. Chaque recherche du module Sites web en apporte de nouvelles.
+
+**OpenStreetMap.** La carte libre liste, département par département, les entreprises qui ont un site : artisans,
+commerces, bureaux et services, restaurants et cafés, hébergements. Le module lui pose une question par département
+(serveur public Overpass) et n'en garde que le nom, le métier, la ville, le téléphone, l'email et le site
+(`site_care_map_businesses`). Sont laissés de côté : les enseignes (étiquette de marque), une adresse qui pointe à
+l'intérieur d'un site (« …/magasins/rennes »), un site partagé par trois entreprises ou plus du département, les
+organismes publics et les associations. La recherche lit ensuite chaque site et garde ce que
+l'utilisateur a choisi : tous les sites, ceux qui ont un souci, ou ceux qui ont un souci de sécurité (site piraté, pas
+de cadenas, PHP ou WordPress qui n'est plus suivi ou qui s'arrête bientôt). Un site lu n'est jamais relu par une
+recherche suivante, gardé ou non. La ville qui manque sur la carte est retrouvée par la position (geo.api.gouv.fr),
+pour les sites gardés seulement ; quand ce service ne répond pas, la boucle de fond la rattrape entre deux recherches.
+Les données d'OpenStreetMap sont sous licence ODbL : l'écran crédite ses contributeurs. Les départements
+d'outre-mer ne sont pas proposés.
+
+Dans les deux cas, un site de réseau, une page Facebook ou un mini-site d'annuaire sont laissés de côté, et un site
+gardé sans adresse e-mail reçoit celle que montrent ses pages de contact et de mentions légales.
 
 Une entreprise ne vit que dans le module (`site_care_sites`) jusqu'au premier message. À ce moment elle devient un
-prospect du cœur, par le chemin du cœur lui-même (« garder à la main » un candidat écarté) : les règles du cœur
-s'appliquent alors à elle comme à tout prospect (« ne plus contacter », verrou entre modules, désinscription, capture
-des réponses).
+prospect du cœur : par le chemin du cœur lui-même (« garder à la main » un candidat écarté) quand elle vient de la
+base, par une création de prospect quand elle vient d'OpenStreetMap. Les règles du cœur s'appliquent alors à elle
+comme à tout prospect (« ne plus contacter », verrou entre modules, désinscription, capture des réponses).
 
 ### Ce qui est lu sur un site
 
@@ -65,8 +82,9 @@ Le contrat est décrit dans `docs/PRODUCT_MODULES.md` du cœur : le cœur n'impo
 
 - **API** : le `pyproject.toml` déclare l'entry point `devleadhunter.product_modules` :
   `site-care = "devleadhunter_site_care.module:SiteCareModule"`. Le module fournit ses six routers, sa boucle de fond
-  (`SiteCareWorker` : les recherches, puis le recontrôle des sites dont le contrôle a plus de sept jours), sa migration
-  (`add_site_care_tables`, après celles du cœur) et le traitement du beacon de sa page (`site_care_page_opened`).
+  (`SiteCareWorker` : les recherches, puis le recontrôle des sites dont le contrôle a plus de sept jours), ses
+  migrations (`add_site_care_tables` puis `add_site_care_open_map_search`, après celles du cœur) et le traitement du
+  beacon de sa page (`site_care_page_opened`).
   Il n'ajoute aucune dépendance : `httpx` et `dnspython` sont déjà dans `api/requirements.txt` du cœur.
 - **Envoi** : `SendService` passe par `EmailSendingService.send_via_user_identity` du cœur (expéditeur du compte,
   signature par défaut, pied de désinscription, adresse de réponse captée, journal `email_logs`). Avant d'écrire, il
