@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devleadhunter-site-care"
+version = "1.0.0"
+description = "Entretien de sites : module produit optionnel de DevLeadHunter."
+requires-python = ">=3.11"
+# Nothing the core lacks: httpx, dnspython and pydantic are pinned by its requirements.txt.
+dependencies = []
+
+[project.entry-points."devleadhunter.product_modules"]
+site-care = "devleadhunter_site_care.module:SiteCareModule"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["devleadhunter_site_care", "devleadhunter_site_care.*"]
+
+[tool.ruff]
+# py311 = le Python du venv de production (VPS). Une cible plus récente pousse des
+# syntaxes (PEP 695) qui font crasher uvicorn au boot alors que tout est vert en local.
+target-version = "py311"
+line-length = 120
+exclude = [".venv", "venv", "__pycache__", "build"]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes — imports et variables morts
+  "I",    # isort — ordre des imports
+  "UP",   # pyupgrade — syntaxe périmée
+  "B",    # flake8-bugbear — pièges réels (mutable default, boucle qui capture…)
+  "C4",   # comprehensions inutilement verbeuses
+  "SIM",  # simplifications lisibles
+  "RUF",  # règles propres à ruff
+]
+ignore = [
+  "E501",    # la longueur de ligne est portée par le formateur
+  "B008",    # `Depends()` en valeur par défaut est le pattern FastAPI
+  "RUF001",  # les chaînes FR contiennent des caractères typographiques (« », —)
+  "RUF002",
+  "RUF003",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["devleadhunter_site_care"]
+section-order = ["future", "standard-library", "third-party", "devleadhunter-core", "first-party", "local-folder"]
+
+[tool.ruff.lint.isort.sections]
+"devleadhunter-core" = ["api", "core", "enums", "migrations", "models", "schemas", "scrappers", "seeders", "services", "tests"]
+
+[tool.ruff.format]
+quote-style = "double"
