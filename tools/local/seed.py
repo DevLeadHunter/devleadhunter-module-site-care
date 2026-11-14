@@ -76,7 +76,7 @@ SITES: list[tuple[str, str, str, dict[str, Any]]] = [
         "Bellanger Électricité",
         "electricien",
         "Mulhouse",
-        {"gambling_links": ["bahis-giris.test"], "has_description": False},
+        {"gambling_links": ["bahis-giris.test"], "has_hidden_gambling_link": True, "has_description": False},
     ),
     (
         "Élagage Tessier",

@@ -131,7 +131,7 @@ type SiteDetail = {
   google_rating: number | null
   google_reviews_count: number | null
   google_maps_url: string | null
-  unread_text: string | null // la phrase affichée quand le site n'a pas pu être lu (tab = review)
+  unread_text: string | null // la phrase affichée quand le site est à revoir (tab = review)
   fixes: SitePoint[]
   watches: SitePoint[]
   good_line: string | null
@@ -210,7 +210,7 @@ type SiteDetail = {
 }
 ```
 
-- Quand le site n'a pas pu être lu, `fixes`, `watches` et `offer` sont vides et `message` vaut `null`.
+- Quand le site est à revoir (`tab = review`), `fixes`, `watches` et `offer` sont vides et `message` vaut `null`.
 - `can_send` est faux quand il n'y a pas d'adresse, que le message est déjà parti, ou que le cœur interdit le
   contact.
 

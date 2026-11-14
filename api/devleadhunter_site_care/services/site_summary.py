@@ -114,7 +114,13 @@ class SiteSummarizer:
 
     @classmethod
     def summarize(
-        cls, points: list[SitePoint], rules: WritingRules, *, was_reached: bool, was_read: bool
+        cls,
+        points: list[SitePoint],
+        rules: WritingRules,
+        *,
+        was_reached: bool,
+        was_read: bool,
+        is_address_doubtful: bool,
     ) -> SiteSummary:
         """
         Sum a check up.
@@ -124,12 +130,16 @@ class SiteSummarizer:
             rules: The owner's choices.
             was_reached: Whether the site answered at all.
             was_read: Whether its home page was read.
+            is_address_doubtful: Whether the address may no longer be the business's own.
 
         Returns:
-            The summary; a site that was not read has no lead and waits for a look by hand.
+            The summary; a site that was not read, or whose address is doubtful, has no lead and waits for a
+            look by hand.
         """
         if not was_read:
             return SiteSummary(status=SiteStatus.UNREADABLE if was_reached else SiteStatus.UNREACHABLE)
+        if is_address_doubtful:
+            return SiteSummary(status=SiteStatus.DOUBTFUL_ADDRESS)
         looked_at: list[SitePoint] = [point for point in points if point.key not in rules.disabled_points]
         fixes: list[SitePoint] = [point for point in looked_at if point.state == PointState.FIX]
         watches: list[SitePoint] = [point for point in looked_at if point.state == PointState.WATCH]

@@ -456,7 +456,7 @@ class TestCareAndWatch:
         _candidate(db, owner, core_search, "Garage Jacquet", "garage-jacquet.test")
         _candidate(db, owner, core_search, "Auto Daniel", "auto-daniel.test")
         readings["bellanger-electricite.test"] = reading_of(
-            "bellanger-electricite.test", gambling_links=["bahis.example"]
+            "bellanger-electricite.test", gambling_links=["bahis.example"], has_hidden_gambling_link=True
         )
         readings["garage-jacquet.test"] = reading_of("garage-jacquet.test", powered_by="PHP/8.2.20")
         readings["auto-daniel.test"] = reading_of("auto-daniel.test", powered_by="PHP/8.2.12")
@@ -472,6 +472,75 @@ class TestCareAndWatch:
         assert deadline["title"] == "PHP 8.2 s’arrête le 31 décembre 2026"
         assert (deadline["site_count"], deadline["action_label"]) == (2, "Voir ces 2 prospects")
         assert deadline["target"] == {"site_id": None, "tab": "all", "kind": "late"}
+
+    def test_an_address_that_shows_gambling_openly_waits_for_a_look_by_hand(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        db: Session,
+        owner: User,
+        core_search: ProspectSearch,
+        readings: dict[str, SiteReading],
+    ) -> None:
+        _candidate(db, owner, core_search, "Bellanger Électricité", "bellanger-electricite.test")
+        _candidate(db, owner, core_search, "Garage Jacquet", "garage-jacquet.test")
+        readings["bellanger-electricite.test"] = reading_of(
+            "bellanger-electricite.test",
+            host_on_another_domain="jeux.example",
+            gambling_links=["jeux.example"],
+            powered_by="PHP/5.6.40",
+        )
+        readings["garage-jacquet.test"] = reading_of("garage-jacquet.test", gambling_links=["casino.example"])
+        _run_search(client, auth_headers, trades=[], country="FR", cities=[], count=10)
+
+        review = client.get(f"{_SITES}?tab=review", headers=auth_headers).json()["sites"]
+        sheets = {
+            site["business_name"]: client.get(f"{_SITES}/{site['id']}", headers=auth_headers).json() for site in review
+        }
+
+        assert {site["business_name"]: site["lead"]["sentence"] for site in review} == {
+            "Bellanger Électricité": "L’adresse renvoie vers un site de jeux d’argent",
+            "Garage Jacquet": "Lien visible vers un site de jeux d’argent",
+        }
+        assert sheets["Bellanger Électricité"]["unread_text"].startswith(
+            "L’adresse du site renvoie aujourd’hui vers jeux.example, un site de jeux d’argent."
+        )
+        assert sheets["Garage Jacquet"]["unread_text"].startswith(
+            "La page d’accueil montre des liens de jeux d’argent vers casino.example."
+        )
+        assert [
+            (sheet["can_send"], sheet["message"], sheet["fixes"], sheet["good_line"]) for sheet in sheets.values()
+        ] == [(False, None, [], None), (False, None, [], None)]
+
+    def test_the_watch_drops_a_hacked_site_a_later_check_rules_out(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        db: Session,
+        owner: User,
+        core_search: ProspectSearch,
+        readings: dict[str, SiteReading],
+    ) -> None:
+        _candidate(db, owner, core_search, "Bellanger Électricité", "bellanger-electricite.test")
+        readings["bellanger-electricite.test"] = reading_of(
+            "bellanger-electricite.test", gambling_links=["bahis.example"], has_hidden_gambling_link=True
+        )
+        _run_search(client, auth_headers, trades=[], country="FR", cities=[], count=10)
+        lines_while_hacked = client.get("/api/v1/site-care/watch", headers=auth_headers).json()["today"]
+        site = db.execute(select(SiteCareSite)).scalars().one()
+        site.checked_at = datetime.utcnow() - timedelta(days=30)
+        db.commit()
+        readings["bellanger-electricite.test"] = reading_of(
+            "bellanger-electricite.test", gambling_links=["jeux.example"], host_on_another_domain="jeux.example"
+        )
+        watch_service._next_pass_after = 0.0
+
+        asyncio.run(watch_service.recheck_due_sites())
+
+        db.refresh(site)
+        assert [line["title"] for line in lines_while_hacked] == ["Un site piraté"]
+        assert site.status == "doubtful_address"
+        assert client.get("/api/v1/site-care/watch", headers=auth_headers).json()["today"] == []
 
     def test_an_old_check_is_refreshed_and_a_site_that_fell_is_noted(
         self,

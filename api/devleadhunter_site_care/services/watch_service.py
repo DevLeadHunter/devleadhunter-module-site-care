@@ -106,7 +106,8 @@ class WatchService:
                 if site.status == SiteStatus.UNREACHABLE.value:
                     gone.append((event, site))
             elif event.kind == "hacked":
-                lines.append(self._hacked_line(event, site, now))
+                if self._is_still_hacked(site):
+                    lines.append(self._hacked_line(event, site, now))
             else:
                 worse: WatchLine | None = self._worse_line(event, site, now)
                 if worse is not None:
@@ -199,6 +200,14 @@ class WatchService:
     def _place(site: SiteCareSite) -> str:
         """A business with its city: « Bellanger Électricité, à Mulhouse »."""
         return f"{site.business_name}, à {site.city}" if site.city else site.business_name
+
+    @staticmethod
+    def _is_still_hacked(site: SiteCareSite) -> bool:
+        """Whether the site's last check still finds hidden gambling links (a later check may have ruled it out)."""
+        return any(
+            point["key"] == PointKey.HACKED.value and point["state"] == PointState.FIX.value
+            for point in site.points or []
+        )
 
     def _hacked_line(self, event: SiteCareWatchEvent, site: SiteCareSite, now: datetime) -> WatchLine:
         return WatchLine(

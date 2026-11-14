@@ -6,9 +6,9 @@ from datetime import date, datetime
 
 from conftest import CHECK_DAY, reading_of
 
-from devleadhunter_site_care.catalog import IssueKind, PointKey, PointState, SiteStatus, WritingTrigger
+from devleadhunter_site_care.catalog import AddressDoubt, IssueKind, PointKey, PointState, SiteStatus, WritingTrigger
 from devleadhunter_site_care.services.site_points import SitePoint, SitePointReader
-from devleadhunter_site_care.services.site_reader import HomePageFacts, SiteReading
+from devleadhunter_site_care.services.site_reader import HomePageFacts, SiteAddress, SiteReading
 from devleadhunter_site_care.services.site_summary import SiteSummarizer, SiteSummary, WritingRules
 
 
@@ -23,6 +23,7 @@ def _summary(reading: SiteReading, rules: WritingRules | None = None) -> SiteSum
         rules or WritingRules(),
         was_reached=reading.was_reached,
         was_read=reading.was_read,
+        is_address_doubtful=reading.address_doubt is not None,
     )
 
 
@@ -81,14 +82,14 @@ class TestPadlock:
 
 
 class TestHackedPage:
-    def test_an_outside_gambling_link_marks_a_hacked_page(self) -> None:
+    def test_an_outside_gambling_link_is_found(self) -> None:
         html = '<a href="https://guncel-bahis-siteleri.example/giris">deneme bonusu veren siteler</a>'
 
         assert HomePageFacts.outside_gambling_links(html, "bellanger-electricite.test") == [
             "guncel-bahis-siteleri.example"
         ]
 
-    def test_a_link_to_a_slot_or_lottery_site_marks_a_hacked_page(self) -> None:
+    def test_a_link_to_a_slot_or_lottery_site_is_found(self) -> None:
         html = (
             '<a href="https://jeux.example/">Situs Slot Online terpercaya</a>'
             '<a href="https://loterie.example/">Bandar Togel</a>'
@@ -113,11 +114,74 @@ class TestHackedPage:
 
         assert HomePageFacts.outside_gambling_links(html, "www.bahis-club.test") == []
 
+    def test_a_link_in_a_block_sized_to_nothing_is_hidden(self) -> None:
+        html = (
+            "<p>Notre atelier</p><marquee style='position: absolute; width: 0px;'>"
+            '<a href="https://paris.example/">autre lien</a><a href="https://jeux.example/">deneme bonusu</a></marquee>'
+        )
+
+        assert HomePageFacts.has_hidden_gambling_link(html, "bellanger-electricite.test") is True
+
+    def test_a_link_in_a_block_pushed_off_the_screen_is_hidden(self) -> None:
+        html = (
+            '<div style="position:absolute;top: -9999px;"><div>Jeux en ligne</div>'
+            '<p>Nos experts sur <a href="https://online-casino.example/">online-casino.example</a></p></div>'
+        )
+
+        assert HomePageFacts.has_hidden_gambling_link(html, "bellanger-electricite.test") is True
+
+    def test_a_link_shown_to_the_visitor_is_not_hidden(self) -> None:
+        html = (
+            '<img style="display:none" src="/pixel.png"><div style="display:none"><div>menu</div></div>'
+            '<h2>Nos partenaires</h2><p>Un <a href="https://jeux.example/">casino en ligne</a> à découvrir</p>'
+        )
+
+        assert HomePageFacts.outside_gambling_links(html, "bellanger-electricite.test") == ["jeux.example"]
+        assert HomePageFacts.has_hidden_gambling_link(html, "bellanger-electricite.test") is False
+
+    def test_a_title_that_sells_gambling_is_recognised(self) -> None:
+        gambling_title = HomePageFacts.title_of("<html><title>\n Situs Slot Online | Bandar Toto 4D </title></html>")
+        business_title = HomePageFacts.title_of("<title>Bellanger Électricité, électricien à Reims</title>")
+
+        assert HomePageFacts.is_gambling_text(gambling_title) is True
+        assert HomePageFacts.is_gambling_text(business_title) is False
+
     def test_a_hacked_page_leads_everything_else(self) -> None:
-        summary = _summary(reading_of(gambling_links=["bahis.example"], powered_by="PHP/7.4.33"))
+        summary = _summary(
+            reading_of(gambling_links=["bahis.example"], has_hidden_gambling_link=True, powered_by="PHP/7.4.33")
+        )
 
         assert summary.lead is not None and summary.lead.key == PointKey.HACKED
         assert summary.also_words == ["version à risque (PHP 7.4)"]
+
+
+class TestDoubtfulAddress:
+    def test_an_address_that_leads_to_a_gambling_site_elsewhere_is_doubtful(self) -> None:
+        assert SiteAddress.host_on_another_domain("jardins-guillot.test", "https://www.jeux.example/") == "jeux.example"
+        assert SiteAddress.host_on_another_domain("jardins-guillot.test", "https://www.jardins-guillot.test/fr") is None
+        moved = reading_of(host_on_another_domain="jeux.example", gambling_links=["jeux.example"])
+        renamed = reading_of(host_on_another_domain="jardins-guillot-paysage.test")
+
+        assert (moved.address_doubt, renamed.address_doubt) == (AddressDoubt.LEADS_TO_GAMBLING_SITE, None)
+
+    def test_gambling_shown_openly_is_doubtful_where_hidden_links_are_a_hack(self) -> None:
+        replaced = reading_of(has_gambling_title=True)
+        link_for_sale = reading_of(gambling_links=["jeux.example"])
+        hacked = reading_of(gambling_links=["jeux.example"], has_hidden_gambling_link=True)
+
+        assert (replaced.address_doubt, link_for_sale.address_doubt, hacked.address_doubt) == (
+            AddressDoubt.TITLE_SELLS_GAMBLING,
+            AddressDoubt.VISIBLE_GAMBLING_LINK,
+            None,
+        )
+
+    def test_a_doubtful_address_gets_no_message_whatever_else_was_read(self) -> None:
+        reading = reading_of(gambling_links=["jeux.example"], powered_by="PHP/5.6.40")
+
+        summary = _summary(reading)
+
+        assert (summary.status, summary.lead, summary.fixes) == (SiteStatus.DOUBTFUL_ADDRESS, None, [])
+        assert {point.state for point in _points(reading).values()} == {PointState.UNKNOWN}
 
 
 class TestListingPhone:

@@ -69,6 +69,15 @@ class SiteStatus(StrEnum):
     NOTHING = "nothing"
     UNREACHABLE = "unreachable"
     UNREADABLE = "unreadable"
+    DOUBTFUL_ADDRESS = "doubtful_address"
+
+
+class AddressDoubt(StrEnum):
+    """Why a site's address may no longer be the business's own: gambling shown openly, where a hack hides it."""
+
+    LEADS_TO_GAMBLING_SITE = "leads_to_gambling_site"
+    TITLE_SELLS_GAMBLING = "title_sells_gambling"
+    VISIBLE_GAMBLING_LINK = "visible_gambling_link"
 
 
 class SiteTab(StrEnum):

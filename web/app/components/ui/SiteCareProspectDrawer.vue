@@ -45,7 +45,7 @@
 
           <template v-else>
             <section v-if="site.unread_text" class="app-card p-5">
-              <h3 class="text-[15px] font-semibold text-[var(--app-ink)]">Contrôle à refaire</h3>
+              <h3 class="text-[15px] font-semibold text-[var(--app-ink)]">À vérifier à la main</h3>
               <p class="mt-3 text-sm leading-relaxed text-[var(--app-ink-soft)]">{{ site.unread_text }}</p>
             </section>
 

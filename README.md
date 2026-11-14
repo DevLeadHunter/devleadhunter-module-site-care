@@ -61,8 +61,14 @@ l'internet public (`PublicOnlyAsyncTransport` du cœur). Douze points en sortent
 coordonnées (numéro de la fiche Google, numéro cliquable, année en bas de page), visibilité (lecture sur téléphone,
 présentation dans Google). « Chercher son email » lit en plus la page de contact et les mentions légales du site.
 
-Un site trop lent à répondre est rangé « à revoir », jamais annoncé comme disparu. Un piratage n'est retenu que sur
-des liens sortants vers des sites de jeux d'argent (le mot « casino » seul ne suffit pas).
+Un site trop lent à répondre est rangé « à revoir », jamais annoncé comme disparu.
+
+Un piratage n'est retenu que sur des liens **cachés au visiteur** (bloc non affiché, de taille nulle ou poussé hors
+de l'écran) vers des sites de jeux d'argent ; le mot « casino » seul ne suffit pas. Des jeux d'argent montrés
+ouvertement disent autre chose : l'adresse renvoie vers un site de jeux sur un autre domaine, le titre de la page
+vend des jeux, ou un lien de casino est laissé visible. Le nom de domaine a alors sans doute été repris (nom expiré
+racheté, site refait par un vendeur de liens). Ces sites sont rangés « à revoir » avec ce qui a été vu, sans message :
+rien de ce qui se lit là ne peut être reproché à l'entreprise.
 
 **Ce dépôt est public : aucun vrai site n'y est associé à ce qui a été vu chez lui.** Les tests n'utilisent que des
 noms et des domaines inventés ; aucun fichier de résultats réels n'est commité (`data/` est ignoré).

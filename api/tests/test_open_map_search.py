@@ -291,6 +291,30 @@ class TestOpenMapSearch:
         assert db.execute(select(SiteCareSite.city)).scalars().all() == [None]
         assert db.execute(select(SiteCareMapBusiness.latitude, SiteCareMapBusiness.longitude)).all() == [(None, None)]
 
+    def test_a_search_for_security_issues_leaves_a_doubtful_address_out(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        open_map_answers: dict[str, str],
+        readings: dict[str, SiteReading],
+    ) -> None:
+        open_map_answers["35"] = _answer(
+            _plumber("Plomberie Guillot", "plomberie-guillot.test"),
+            _plumber("Plomberie Imbert", "plomberie-imbert.test"),
+        )
+        readings["plomberie-guillot.test"] = reading_of(
+            "plomberie-guillot.test", gambling_links=["jeux.example"], has_hidden_gambling_link=True
+        )
+        readings["plomberie-imbert.test"] = reading_of(
+            "plomberie-imbert.test", gambling_links=["jeux.example"], host_on_another_domain="jeux.example"
+        )
+
+        search = _run_search(client, auth_headers, departments=["35"], keep_rule="security", count=50)
+        [site] = client.get(f"{_SITES}?tab=all", headers=auth_headers).json()["sites"]
+
+        assert (search["checked_count"], search["imported_count"]) == (2, 1)
+        assert (site["business_name"], site["lead"]["kind"]) == ("Plomberie Guillot", "hack")
+
     def test_a_site_read_once_is_never_read_again(
         self,
         client: TestClient,

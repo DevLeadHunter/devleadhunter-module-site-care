@@ -38,6 +38,9 @@ _MONTHS: tuple[str, ...] = (
 )
 _UNREACHABLE_FACT: str = "Le site ne répond plus : le contrôle n’a pas pu être fait."
 _UNREADABLE_FACT: str = "Le site n’a pas pu être lu automatiquement : à regarder à la main."
+_DOUBTFUL_ADDRESS_FACT: str = (
+    "L’adresse affiche des jeux d’argent sans les cacher : le site n’est peut-être plus celui de l’entreprise."
+)
 
 
 class FrenchDates:
@@ -138,11 +141,14 @@ class SitePointReader:
             reading: What was read.
 
         Returns:
-            The points in the catalogue's order; all unknown, with the reason, when the home page was not read.
+            The points in the catalogue's order; all unknown, with the reason, when the home page was not read
+            or its address is doubtful.
         """
         if not reading.was_read:
             fact: str = _UNREADABLE_FACT if reading.was_reached else _UNREACHABLE_FACT
             return [SitePoint(key, PointState.UNKNOWN, fact) for key in PointKey]
+        if reading.address_doubt is not None:
+            return [SitePoint(key, PointState.UNKNOWN, _DOUBTFUL_ADDRESS_FACT) for key in PointKey]
         return [
             self._https(reading),
             self._php(reading),
@@ -274,7 +280,7 @@ class SitePointReader:
 
     @staticmethod
     def _hacked(reading: SiteReading) -> SitePoint:
-        if reading.gambling_links:
+        if reading.has_hidden_gambling_link:
             return SitePoint(
                 PointKey.HACKED,
                 PointState.FIX,

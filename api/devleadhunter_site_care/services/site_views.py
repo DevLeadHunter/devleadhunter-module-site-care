@@ -30,6 +30,7 @@ from devleadhunter_site_care.schemas.site import (
     SiteState,
     TradeOption,
 )
+from devleadhunter_site_care.services.address_doubt_wording import AddressDoubtWording
 from devleadhunter_site_care.services.care_plan_service import care_plan_service
 from devleadhunter_site_care.services.owner_settings_service import OwnerSettings
 from devleadhunter_site_care.services.send_service import FIRST_MESSAGE, send_service
@@ -137,18 +138,17 @@ class SiteViews:
         message: OutgoingMessage | None = writer.first_message(with_page_link=False)
         with_link: OutgoingMessage | None = writer.first_message(with_page_link=True)
         refusal: str | None = send_service.first_message_refusal(db, site, settings)
-        is_unread: bool = site.status in (SiteStatus.UNREACHABLE.value, SiteStatus.UNREADABLE.value)
         return SiteDetail(
             **item.model_dump(),
             phone=site.phone,
             google_rating=site.google_rating,
             google_reviews_count=site.google_reviews_count,
             google_maps_url=site.google_maps_url,
-            unread_text=self._unread_text(site),
+            unread_text=self._review_text(site),
             fixes=[self._point_view(point) for point in summary.fixes],
             watches=[self._point_view(point) for point in summary.watches],
-            good_line=None if is_unread else SheetLines.good_line(summary),
-            hidden_line=None if is_unread else SheetLines.hidden_line(summary),
+            good_line=SheetLines.good_line(summary),
+            hidden_line=SheetLines.hidden_line(summary),
             offer=[
                 OfferLineView(label=line.label, price_label=Money.label(line.price_cents))
                 for line in SiteSummarizer.offer_lines(summary.corrections, settings.prices)
@@ -224,19 +224,11 @@ class SiteViews:
     def _lead(site: SiteCareSite, summary: SiteSummary) -> SiteLead:
         """The tag and the sentence of a line."""
         if site.status == SiteStatus.UNREACHABLE.value:
-            return SiteLead(
-                kind=IssueKind.REVIEW.value,
-                kind_label=KIND_LABELS[IssueKind.REVIEW],
-                tone="amber",
-                sentence="Le site ne répond plus",
-            )
+            return SiteViews._review_lead("Le site ne répond plus")
         if site.status == SiteStatus.UNREADABLE.value:
-            return SiteLead(
-                kind=IssueKind.REVIEW.value,
-                kind_label=KIND_LABELS[IssueKind.REVIEW],
-                tone="amber",
-                sentence="Le site n’a pas pu être lu automatiquement",
-            )
+            return SiteViews._review_lead("Le site n’a pas pu être lu automatiquement")
+        if site.status == SiteStatus.DOUBTFUL_ADDRESS.value:
+            return SiteViews._review_lead(AddressDoubtWording.list_line_of(site))
         lead: SitePoint | None = summary.lead
         if lead is None or lead.kind is None:
             return SiteLead(
@@ -254,6 +246,13 @@ class SiteViews:
         )
 
     @staticmethod
+    def _review_lead(sentence: str) -> SiteLead:
+        """The tag and the sentence of a site that waits for a look by hand."""
+        return SiteLead(
+            kind=IssueKind.REVIEW.value, kind_label=KIND_LABELS[IssueKind.REVIEW], tone="amber", sentence=sentence
+        )
+
+    @staticmethod
     def _point_view(point: SitePoint) -> SitePointView:
         """A point of the sheet."""
         kind: IssueKind = point.kind or IssueKind.REVIEW
@@ -262,10 +261,12 @@ class SiteViews:
         )
 
     @staticmethod
-    def _unread_text(site: SiteCareSite) -> str | None:
-        """What the sheet says of a site that could not be read."""
+    def _review_text(site: SiteCareSite) -> str | None:
+        """What the sheet says of a site that waits for a look by hand: not read, or showing gambling openly."""
         if site.status == SiteStatus.UNREACHABLE.value:
             return _UNREACHABLE_TEXT
+        if site.status == SiteStatus.DOUBTFUL_ADDRESS.value:
+            return AddressDoubtWording.sheet_text_of(site)
         return _UNREADABLE_TEXT if site.status == SiteStatus.UNREADABLE.value else None
 
     @staticmethod

@@ -2,7 +2,8 @@
 Reads a business website the way a visitor does: one request for its home page, and the public DNS of its domain.
 
 Nothing is submitted, no hidden path is requested, no login is tried. What is read is kept as plain facts
-(:class:`SiteReading`); what they mean is decided elsewhere (:mod:`devleadhunter_site_care.services.site_points`).
+(:class:`SiteReading`); the twelve points they add up to are decided elsewhere
+(:mod:`devleadhunter_site_care.services.site_points`).
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from services.prospect_search.trade_catalog import TradeCatalog, TradeProfile
 from services.public_url_guard import PublicOnlyAsyncTransport
 from services.website_liveness_service import WebsiteLivenessService
 
-from devleadhunter_site_care.catalog import NOT_AN_OWN_SITE_HOSTS
+from devleadhunter_site_care.catalog import NOT_AN_OWN_SITE_HOSTS, AddressDoubt
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,10 @@ class SiteReading:
         page_digits: Every digit of the visible text and the ``tel:`` links, to look a known number up in.
         emails: The email addresses shown on the page.
         copyright_years: The years written next to a copyright mark.
-        gambling_links: Links to outside gambling sites, the mark of a hacked page.
+        gambling_links: The outside gambling sites the page links to.
+        has_hidden_gambling_link: Whether one of those links is hidden from the visitor, the mark of a hacked page.
+        has_gambling_title: Whether the page's own title sells gambling.
+        host_on_another_domain: The host the home page was finally served from, when it is on another domain.
         has_mail_server: Whether the domain receives mail (MX); None when the lookup failed.
         has_spf: Whether the domain declares its senders; None when the lookup failed.
         has_dmarc: Whether the domain has a DMARC rule; None when the lookup failed.
@@ -86,6 +90,9 @@ class SiteReading:
     emails: list[str] = field(default_factory=list)
     copyright_years: list[int] = field(default_factory=list)
     gambling_links: list[str] = field(default_factory=list)
+    has_hidden_gambling_link: bool = False
+    has_gambling_title: bool = False
+    host_on_another_domain: str | None = None
     has_mail_server: bool | None = None
     has_spf: bool | None = None
     has_dmarc: bool | None = None
@@ -101,6 +108,19 @@ class SiteReading:
     def was_read(self) -> bool:
         """Whether the home page itself was read (a refusal or an error page is not the home page)."""
         return self.error is None and self.status_code is not None and 200 <= self.status_code < 300
+
+    @property
+    def address_doubt(self) -> AddressDoubt | None:
+        """Why the address may no longer be the business's own, None when nothing says so."""
+        if not self.was_read:
+            return None
+        if self.host_on_another_domain is not None and (self.gambling_links or self.has_gambling_title):
+            return AddressDoubt.LEADS_TO_GAMBLING_SITE
+        if self.has_gambling_title:
+            return AddressDoubt.TITLE_SELLS_GAMBLING
+        if self.gambling_links and not self.has_hidden_gambling_link:
+            return AddressDoubt.VISIBLE_GAMBLING_LINK
+        return None
 
     def to_json(self) -> dict[str, Any]:
         """The reading as a JSON-ready dictionary."""
@@ -163,6 +183,22 @@ class SiteAddress:
         """
         labels: list[str] = SiteAddress.bare_host(host).split(".")
         return ".".join(labels[-2:]) if len(labels) > 2 else ".".join(labels)
+
+    @staticmethod
+    def host_on_another_domain(host: str, page_url: str) -> str | None:
+        """
+        The host a page was served from, when the site's address led to another domain.
+
+        Args:
+            host: The site's host.
+            page_url: The address the page finally came from, once the redirects were followed.
+
+        Returns:
+            That host without « www. », None when the page stayed on the site's own domain.
+        """
+        page_host: str = SiteAddress.bare_host(SiteAddress.host_of(page_url))
+        is_same_domain: bool = SiteAddress.mail_domain_of(page_host) == SiteAddress.mail_domain_of(host)
+        return None if is_same_domain or not page_host else page_host
 
     @staticmethod
     def is_own_site(
@@ -247,8 +283,7 @@ class HomePageFacts:
         ("IONOS", ("website-start.de", "ionos-website")),
         ("Hostinger", ('content="hostinger', "zyrosite.com")),
     )
-    # Words no honest local business links to: one outside link carrying them marks a hacked page. « casino » alone
-    # is left out on purpose (a supermarket, a town's casino).
+    # Words no honest local business uses; « casino » alone is left out on purpose (a supermarket, a town's casino).
     GAMBLING_PATTERNS: ClassVar[tuple[re.Pattern[str], ...]] = tuple(
         re.compile(pattern, re.IGNORECASE)
         for pattern in (
@@ -256,15 +291,34 @@ class HomePageFacts:
             r"\btogel\b",
             r"\bslot\s*gacor\b",
             r"\bslot\s+online\b",
-            r"\bsitus\s+(?:slot|judi)\b",
+            r"\bsitus\s+(?:slot|judi|togel|toto)\b",
+            r"\bbandar\s+(?:slot|togel|toto)\b",
             r"\bjudi\s+(?:online|slot|bola)\b",
             r"\bdeneme\s+bonusu\b",
             r"\bsbobet\b",
             r"\bcasino\s+(?:online|en\s+ligne|siteleri)\b",
             r"\bonline\s+casino\b",
+            r"\bmachines?\s+à\s+sous\s+en\s+ligne\b",
             r"\bpoker\s+online\b",
             r"\bbonus\s+veren\b",
         )
+    )
+    _OUTSIDE_LINK: ClassVar[re.Pattern[str]] = re.compile(
+        r'<a[^>]+href=["\'](?P<href>https?://[^"\']+)["\'][^>]*>(?P<label>[^<]{0,120})', re.IGNORECASE
+    )
+    _STYLED_TAG: ClassVar[re.Pattern[str]] = re.compile(
+        r"<(?P<tag>[a-z][a-z0-9]*)\b[^>]*?(?<![\w-])style\s*=\s*"
+        r"(?P<quote>[\"'])(?P<style>(?:(?!(?P=quote)).)*)(?P=quote)[^>]*>",
+        re.IGNORECASE,
+    )
+    _HIDING_STYLE: ClassVar[re.Pattern[str]] = re.compile(
+        r"(?<![\w-])(?:display\s*:\s*none|visibility\s*:\s*hidden"
+        r"|(?:left|top|right|bottom|text-indent|margin-left|margin-top)\s*:\s*-\d{3,}"
+        r"|(?:width|height|max-width|max-height|font-size|opacity)\s*:\s*0(?![.\d]))",
+        re.IGNORECASE,
+    )
+    _TAGS_WITHOUT_CONTENT: ClassVar[frozenset[str]] = frozenset(
+        {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
     )
     _EMAIL_ADDRESS: ClassVar[str] = r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"
     _IGNORED_EMAIL_MARKS: ClassVar[tuple[str, ...]] = ("sentry", "wixpress", "example", "domaine.", "votre-", "nom@")
@@ -309,6 +363,9 @@ class HomePageFacts:
             }
         )
         reading.gambling_links = cls.outside_gambling_links(html, reading.host)
+        reading.has_hidden_gambling_link = cls.has_hidden_gambling_link(html, reading.host)
+        reading.has_gambling_title = cls.is_gambling_text(cls.title_of(html))
+        reading.host_on_another_domain = SiteAddress.host_on_another_domain(reading.host, page_url)
         reading.contact_page_urls = cls.contact_page_urls(html, page_url, reading.host)
 
     @staticmethod
@@ -372,15 +429,89 @@ class HomePageFacts:
         Returns:
             The hosts linked, at most five.
         """
+        return sorted({linked_host for _, linked_host in cls._outside_gambling_links(html, host)})[:5]
+
+    @classmethod
+    def has_hidden_gambling_link(cls, html: str, host: str) -> bool:
+        """
+        Whether a page hides a link to an outside gambling site from its visitor.
+
+        Args:
+            html: The page's HTML.
+            host: The site's own host, whose links never count.
+
+        Returns:
+            True when such a link sits in a block its own style hides.
+        """
+        link_positions: list[int] = [position for position, _ in cls._outside_gambling_links(html, host)]
+        if not link_positions:
+            return False
+        hidden_blocks: list[tuple[int, int]] = cls._hidden_blocks(html)
+        return any(start <= position < end for position in link_positions for start, end in hidden_blocks)
+
+    @classmethod
+    def is_gambling_text(cls, text: str) -> bool:
+        """
+        Whether a text sells gambling.
+
+        Args:
+            text: A link with its label, or a page's title.
+
+        Returns:
+            True when it carries one of the words no honest local business uses.
+        """
+        return any(pattern.search(text.replace("-", " ")) for pattern in cls.GAMBLING_PATTERNS)
+
+    @staticmethod
+    def title_of(html: str) -> str:
+        """
+        The title of a page.
+
+        Args:
+            html: The page's HTML.
+
+        Returns:
+            The text of its ``<title>``, empty when it has none.
+        """
+        title: re.Match[str] | None = re.search(r"<title[^>]*>(.*?)</title>", html, flags=re.IGNORECASE | re.DOTALL)
+        return re.sub(r"\s+", " ", title.group(1)).strip() if title else ""
+
+    @classmethod
+    def _outside_gambling_links(cls, html: str, host: str) -> list[tuple[int, str]]:
+        """Where each link to an outside gambling site starts in the page, with the host it leads to."""
         own_domain: str = SiteAddress.mail_domain_of(host)
-        linked_hosts: list[str] = []
-        for href, label in re.findall(r'<a[^>]+href=["\'](https?://[^"\']+)["\'][^>]*>([^<]{0,120})', html, flags=re.I):
+        links: list[tuple[int, str]] = []
+        for link in cls._OUTSIDE_LINK.finditer(html):
+            href: str = link.group("href")
             linked_host: str = SiteAddress.bare_host(SiteAddress.host_of(href))
             if not linked_host or linked_host == own_domain or linked_host.endswith(f".{own_domain}"):
                 continue
-            if any(pattern.search(f"{href} {label}".replace("-", " ")) for pattern in cls.GAMBLING_PATTERNS):
-                linked_hosts.append(linked_host)
-        return sorted(set(linked_hosts))[:5]
+            if cls.is_gambling_text(f"{href} {link.group('label')}"):
+                links.append((link.start(), linked_host))
+        return links
+
+    @classmethod
+    def _hidden_blocks(cls, html: str) -> list[tuple[int, int]]:
+        """Where each block hidden by its own style starts and ends in the page."""
+        blocks: list[tuple[int, int]] = []
+        for opening in cls._STYLED_TAG.finditer(html):
+            tag: str = opening.group("tag").lower()
+            if tag in cls._TAGS_WITHOUT_CONTENT or not cls._HIDING_STYLE.search(opening.group("style")):
+                continue
+            blocks.append((opening.start(), cls._end_of_element(html, tag, opening.end())))
+        return blocks
+
+    @staticmethod
+    def _end_of_element(html: str, tag: str, content_start: int) -> int:
+        """Where an element closes, skipping the same tag nested inside it; the page's end when it never closes."""
+        depth: int = 1
+        same_tag: re.Pattern[str] = re.compile(rf"<(?P<closing>/?){re.escape(tag)}\b", re.IGNORECASE)
+        for edge in same_tag.finditer(html, content_start):
+            is_closing_tag: bool = bool(edge.group("closing"))
+            depth += -1 if is_closing_tag else 1
+            if depth == 0:
+                return edge.start()
+        return len(html)
 
     @classmethod
     def contact_page_urls(cls, html: str, page_url: str, host: str) -> list[str]:

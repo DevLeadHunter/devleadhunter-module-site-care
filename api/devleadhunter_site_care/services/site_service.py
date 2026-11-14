@@ -29,6 +29,7 @@ from devleadhunter_site_care.services.site_summary import SiteSummarizer, SiteSu
 from devleadhunter_site_care.services.wordpress_releases import wordpress_releases
 
 _UNREAD_STATUSES: tuple[str, ...] = (SiteStatus.UNREACHABLE.value, SiteStatus.UNREADABLE.value)
+_REVIEW_STATUSES: tuple[str, ...] = (*_UNREAD_STATUSES, SiteStatus.DOUBTFUL_ADDRESS.value)
 _NO_LEAD_RANK: int = 999
 
 
@@ -161,7 +162,7 @@ class SiteService:
         """The tab a site falls under."""
         if site.written_at is not None:
             return SiteTab.WRITTEN
-        if site.status in _UNREAD_STATUSES:
+        if site.status in _REVIEW_STATUSES:
             return SiteTab.REVIEW
         if site.status == SiteStatus.NOTHING.value:
             return SiteTab.NOTHING
@@ -176,7 +177,7 @@ class SiteService:
             return SiteCareSite.written_at.is_not(None)
         not_written: ColumnElement[bool] = SiteCareSite.written_at.is_(None)
         if tab == SiteTab.REVIEW:
-            return and_(not_written, SiteCareSite.status.in_(_UNREAD_STATUSES))
+            return and_(not_written, SiteCareSite.status.in_(_REVIEW_STATUSES))
         if tab == SiteTab.NOTHING:
             return and_(not_written, SiteCareSite.status == SiteStatus.NOTHING.value)
         deserves_message: ColumnElement[bool] = and_(not_written, SiteCareSite.status == SiteStatus.TO_WRITE.value)
@@ -201,6 +202,7 @@ class SiteService:
             rules,
             was_reached=site.status != SiteStatus.UNREACHABLE.value,
             was_read=site.status not in _UNREAD_STATUSES,
+            is_address_doubtful=site.status == SiteStatus.DOUBTFUL_ADDRESS.value,
         )
 
     async def check_of(
@@ -225,7 +227,11 @@ class SiteService:
         return SiteCheck(
             points=points,
             summary=SiteSummarizer.summarize(
-                points, settings.writing_rules, was_reached=reading.was_reached, was_read=reading.was_read
+                points,
+                settings.writing_rules,
+                was_reached=reading.was_reached,
+                was_read=reading.was_read,
+                is_address_doubtful=reading.address_doubt is not None,
             ),
         )
 
@@ -305,7 +311,7 @@ class SiteService:
             select(SiteCareSite).where(SiteCareSite.user_id == user_id, SiteCareSite.archived_at.is_(None))
         ).scalars()
         for site in sites:
-            if site.status not in _UNREAD_STATUSES:
+            if site.status not in _REVIEW_STATUSES:
                 self._store_summary(site, self.summary_of(site, rules))
         db.commit()
 

@@ -30,7 +30,11 @@ def _writer(reading: SiteReading, business_name: str = "Élagage Renaud", settin
         reading
     )
     summary = SiteSummarizer.summarize(
-        points, (settings or _settings()).writing_rules, was_reached=reading.was_reached, was_read=reading.was_read
+        points,
+        (settings or _settings()).writing_rules,
+        was_reached=reading.was_reached,
+        was_read=reading.was_read,
+        is_address_doubtful=reading.address_doubt is not None,
     )
     return SiteMessageWriter(
         SiteSubject(business_name=business_name, domain="elagage-renaud.test", page_url=_PAGE_URL),
