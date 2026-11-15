@@ -17,4 +17,4 @@ class SiteCareAssistantAnswer(AssistantAnswer):
         cards: The sites found, the most pressing first, the same lines as « Mes prospects ».
     """
 
-    cards: list[SiteListItem] = Field(default_factory=list)
+    cards: list[SiteListItem] = Field(default_factory=list[SiteListItem])
