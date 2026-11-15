@@ -61,36 +61,40 @@
       />
 
       <template v-else>
-        <div
-          class="flex flex-wrap gap-1 rounded-xl border border-[var(--app-line)] bg-[var(--app-surface)] p-1"
-          role="group"
-          aria-label="Trier les prospects"
-        >
-          <button
-            v-for="tab in siteTabs"
-            :key="tab.key"
-            type="button"
-            class="flex min-h-11 flex-[1_1_30%] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-[13px] whitespace-nowrap transition-colors @lg:min-h-9 @lg:flex-row @lg:gap-2 @lg:px-3 @lg:text-sm @4xl:flex-1"
-            :class="
-              tab.key === activeTab
-                ? 'bg-[var(--app-btn-bg)] font-semibold text-[var(--app-btn-text)]'
-                : 'font-medium text-[var(--app-ink-soft)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-ink)]'
-            "
-            :aria-pressed="tab.key === activeTab"
-            @click="selectTab(tab.key)"
+        <div class="rounded-xl border border-[var(--app-line)] bg-[var(--app-surface)] p-1">
+          <div
+            ref="tabRowElement"
+            class="no-scrollbar flex touch-pan-x gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+            :class="tabRowEdgeFadeClass"
+            role="group"
+            aria-label="Trier les prospects"
           >
-            {{ tab.label }}
-            <span
-              class="min-w-6 rounded-full px-2 py-px text-center text-xs font-semibold"
+            <button
+              v-for="tab in siteTabs"
+              :key="tab.key"
+              type="button"
+              class="flex min-h-9 flex-1 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors @lg:gap-2 @lg:px-3 pointer-coarse:min-h-11"
               :class="
                 tab.key === activeTab
-                  ? 'bg-[color-mix(in_srgb,var(--app-btn-text)_18%,transparent)] text-[var(--app-btn-text)]'
-                  : 'bg-[var(--app-surface-2)] text-[var(--app-ink-soft)]'
+                  ? 'bg-[var(--app-btn-bg)] font-semibold text-[var(--app-btn-text)]'
+                  : 'font-medium text-[var(--app-ink-soft)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-ink)]'
               "
+              :aria-pressed="tab.key === activeTab"
+              @click="selectTab(tab.key)"
             >
-              {{ tab.count }}
-            </span>
-          </button>
+              {{ tab.label }}
+              <span
+                class="min-w-6 rounded-full px-2 py-px text-center text-xs font-semibold"
+                :class="
+                  tab.key === activeTab
+                    ? 'bg-[color-mix(in_srgb,var(--app-btn-text)_18%,transparent)] text-[var(--app-btn-text)]'
+                    : 'bg-[var(--app-surface-2)] text-[var(--app-ink-soft)]'
+                "
+              >
+                {{ tab.count }}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div class="flex flex-wrap gap-3">
@@ -216,6 +220,8 @@ import type {
   SiteCareSiteTabLabel,
 } from '../../../types/SiteCareSite'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useSelectedTabReveal } from '~/composables/useSelectedTabReveal'
+import { useTabRowEdgeFade } from '~/composables/useTabRowEdgeFade'
 import { useToast } from '~/composables/useToast'
 import { parseApiDate } from '~/utils/date'
 import { useSiteCareWritingQueue } from '../../../composables/useSiteCareWritingQueue'
@@ -273,6 +279,11 @@ const appliedSearchText: Ref<string> = ref('')
 const currentSearch: Ref<SiteCareSearch | null> = ref(null)
 const isStoppingSearch: Ref<boolean> = ref(false)
 const isOpeningWritingQueue: Ref<boolean> = ref(false)
+const tabRowElement: Ref<HTMLElement | null> = useSelectedTabReveal(
+  (): string => activeTab.value,
+  '[aria-pressed="true"]',
+)
+const tabRowEdgeFadeClass: ComputedRef<string> = useTabRowEdgeFade(tabRowElement)
 
 let latestSiteRequestNumber: number = 0
 let searchTextTimer: ReturnType<typeof setTimeout> | null = null
