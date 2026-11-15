@@ -1,5 +1,5 @@
 <template>
-  <div class="flex min-h-full flex-col gap-8">
+  <div class="flex min-h-full flex-col gap-6">
     <SiteCarePageHeader
       title="Mes prospects"
       :description="siteList?.summary_line ?? null"
@@ -45,7 +45,7 @@
           class="h-5 w-5 shrink-0 animate-spin text-[var(--app-ink-soft)]"
           aria-hidden="true"
         />
-        <p class="min-w-0 flex-[999_1_16rem] text-[15px] text-[var(--app-ink)]" role="status">
+        <p class="min-w-0 flex-[999_1_16rem] text-sm text-[var(--app-ink)]" role="status">
           {{ searchProgressLabel }}
         </p>
         <SiteCareButton variant="secondary" size="small" :is-loading="isStoppingSearch" @click="stopSearch">
@@ -62,7 +62,7 @@
 
       <template v-else>
         <div
-          class="flex flex-wrap gap-1.5 rounded-2xl border border-[var(--app-line)] bg-[var(--app-surface)] p-1.5"
+          class="flex flex-wrap gap-1 rounded-xl border border-[var(--app-line)] bg-[var(--app-surface)] p-1"
           role="group"
           aria-label="Trier les prospects"
         >
@@ -70,7 +70,7 @@
             v-for="tab in siteTabs"
             :key="tab.key"
             type="button"
-            class="flex min-h-14 flex-[1_1_30%] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[15px] whitespace-nowrap transition-colors @lg:flex-row @lg:gap-2.5 @lg:px-3 @lg:text-base @4xl:flex-1"
+            class="flex min-h-11 flex-[1_1_30%] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 text-[13px] whitespace-nowrap transition-colors @lg:min-h-9 @lg:flex-row @lg:gap-2 @lg:px-3 @lg:text-sm @4xl:flex-1"
             :class="
               tab.key === activeTab
                 ? 'bg-[var(--app-btn-bg)] font-semibold text-[var(--app-btn-text)]'
@@ -81,7 +81,7 @@
           >
             {{ tab.label }}
             <span
-              class="min-w-7 rounded-full px-2 py-0.5 text-center text-sm font-semibold"
+              class="min-w-6 rounded-full px-2 py-px text-center text-xs font-semibold"
               :class="
                 tab.key === activeTab
                   ? 'bg-[color-mix(in_srgb,var(--app-btn-text)_18%,transparent)] text-[var(--app-btn-text)]'
@@ -105,7 +105,7 @@
               type="search"
               placeholder="Nom, ville, adresse du site"
               aria-label="Rechercher un prospect"
-              class="app-input h-12 min-h-12 rounded-full pr-4 pl-11 text-[15px]"
+              class="app-input h-10 min-h-10 rounded-full pr-4 pl-11 text-sm pointer-coarse:min-h-11"
             />
           </div>
           <div class="min-w-0 flex-[1_1_14rem] @2xl:max-w-72">
@@ -113,13 +113,13 @@
               v-model="issueKindFilter"
               :options="ISSUE_KIND_OPTIONS"
               aria-label="Filtrer par type de souci"
-              class="h-12 min-h-12 rounded-full px-[18px] text-[15px] font-medium"
+              class="h-10 min-h-10 rounded-full px-4 text-sm font-medium"
             />
           </div>
         </div>
 
         <div
-          class="grid grid-cols-1 gap-5 transition-opacity @3xl:grid-cols-2"
+          class="grid grid-cols-1 gap-4 transition-opacity @2xl:grid-cols-2 @5xl:grid-cols-3"
           :class="{ 'opacity-60': isLoadingSites }"
           :aria-busy="isLoadingSites"
         >
@@ -128,7 +128,7 @@
             :key="listedSite.id"
             :to="`${SITE_CARE_SITES_PATH}/${listedSite.id}`"
           >
-            <div class="mb-3 flex flex-wrap items-center gap-2">
+            <div class="mb-2.5 flex flex-wrap items-center gap-2">
               <SiteCareIssueTag
                 :kind="listedSite.lead.kind"
                 :label="listedSite.lead.kind_label"
@@ -136,13 +136,13 @@
               />
               <SiteCareTechnologyChip v-if="listedSite.lead.tech" :technology="listedSite.lead.tech" />
             </div>
-            <h2 class="text-lg leading-snug font-semibold tracking-[-0.01em] text-[var(--app-ink)]">
+            <h2 class="text-base leading-snug font-semibold tracking-[-0.01em] text-[var(--app-ink)]">
               {{ listedSite.lead.sentence }}
             </h2>
             <p v-if="listedSite.also" class="mt-1.5 text-sm text-[var(--app-ink-soft)]">{{ listedSite.also }}</p>
 
-            <div class="mt-auto pt-4">
-              <div class="flex items-center gap-3 border-t border-[var(--app-line)] pt-4">
+            <div class="mt-auto pt-3">
+              <div class="flex items-center gap-3 border-t border-[var(--app-line)] pt-3">
                 <span
                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-surface-2)] text-[13px] font-semibold text-[var(--app-ink-soft)]"
                   aria-hidden="true"
@@ -150,20 +150,22 @@
                   {{ SiteCareBusinessLabels.initialsOf(listedSite.business_name) }}
                 </span>
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate font-semibold text-[var(--app-ink)]">{{ listedSite.business_name }}</span>
+                  <span class="block truncate text-sm font-semibold text-[var(--app-ink)]">{{
+                    listedSite.business_name
+                  }}</span>
                   <span class="block truncate text-sm text-[var(--app-ink-soft)]">
                     {{ SiteCareBusinessLabels.placeOf(listedSite.trade_label, listedSite.city) }}
                   </span>
                 </span>
                 <span v-if="isOfferShown(listedSite)" class="shrink-0 text-right">
-                  <span class="block text-[19px] leading-tight font-semibold text-[var(--app-ink)]">
+                  <span class="block text-base leading-tight font-semibold text-[var(--app-ink)]">
                     {{ listedSite.price_label }}
                   </span>
-                  <span class="block text-[13px] font-medium text-[var(--app-ink-soft)]">à proposer</span>
+                  <span class="block text-xs font-medium text-[var(--app-ink-soft)]">à proposer</span>
                 </span>
                 <span
                   v-else
-                  class="inline-flex shrink-0 items-center rounded-full px-3 py-1 text-[13px] font-medium whitespace-nowrap"
+                  class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
                   :class="SITE_CARE_TONE_CLASSES[listedSite.state.tone]"
                 >
                   {{ listedSite.state.label }}

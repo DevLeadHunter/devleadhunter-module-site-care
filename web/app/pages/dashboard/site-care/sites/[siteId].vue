@@ -33,7 +33,7 @@
 
     <div v-else class="flex flex-wrap items-start gap-7">
       <div class="flex min-w-0 flex-[999_1_30rem] flex-col gap-5">
-        <SiteCarePageHeader :title="site.business_name" :description="tradeAndCityLabel" />
+        <SiteCarePageHeader :title="site.business_name" :description="tradeAndCityLabel" has-large-title />
 
         <SiteCareFindingCard
           v-if="step === 'finding'"

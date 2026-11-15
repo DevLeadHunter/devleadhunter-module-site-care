@@ -10,7 +10,7 @@
         </SiteCareButton>
         <span
           v-else
-          class="inline-flex min-h-12 items-center rounded-full bg-[var(--app-surface-2)] px-[22px] text-[15px] font-medium text-[var(--app-ink-soft)]"
+          class="inline-flex min-h-10 items-center rounded-full bg-[var(--app-surface-2)] px-5 text-sm font-medium text-[var(--app-ink-soft)] pointer-coarse:min-h-11"
           role="status"
         >
           À jour

@@ -24,6 +24,7 @@
         <SiteCarePageHeader
           title="Nouvelle recherche"
           description="Fait entrer dans le module des entreprises qui ont déjà un site."
+          has-large-title
         />
 
         <template v-if="launchedSearch === null">
@@ -146,7 +147,7 @@
                   autocomplete="off"
                   placeholder="Ajouter une ville"
                   aria-label="Ville à ajouter"
-                  class="app-input h-12 min-w-0 flex-[999_1_12rem] rounded-full px-4 text-[15px]"
+                  class="app-input h-10 min-w-0 flex-[999_1_12rem] rounded-full px-4 text-sm"
                 />
                 <SiteCareButton type="submit" class="flex-[1_1_auto]" :is-disabled="cityInput.trim() === ''">
                   Ajouter

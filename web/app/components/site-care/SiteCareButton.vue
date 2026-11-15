@@ -85,8 +85,8 @@ const OUTLINE_CLASSES: Record<SiteCareButtonVariant, string> = {
 
 const SIZE_CLASSES: Record<SiteCareButtonSize, string> = {
   large: 'h-[52px] min-h-[52px] px-6 text-base',
-  medium: 'h-12 min-h-12 px-6 text-[15px]',
-  small: 'h-11 min-h-11 px-5',
+  medium: 'h-10 min-h-10 px-5 text-sm pointer-coarse:min-h-11',
+  small: 'h-9 min-h-9 px-4 text-sm pointer-coarse:min-h-11',
 }
 
 const sizeAndOutlineClasses: ComputedRef<string> = computed(

@@ -11,7 +11,7 @@
           min="1"
           step="1"
           aria-label="Prix du suivi, en euros par mois"
-          class="app-input h-12 w-24 rounded-xl text-right text-[15px] font-semibold"
+          class="app-input h-10 w-24 rounded-xl text-right text-sm font-semibold"
         />
         € par mois
       </label>

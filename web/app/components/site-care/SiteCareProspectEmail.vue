@@ -35,7 +35,7 @@
         spellcheck="false"
         placeholder="contact@exemple.fr"
         aria-label="Son adresse e-mail"
-        class="app-input h-12 min-w-0 flex-[999_1_12rem] rounded-full px-4 text-[15px]"
+        class="app-input h-10 min-w-0 flex-[999_1_12rem] rounded-full px-4 text-sm"
       />
       <SiteCareButton
         type="submit"
