@@ -15,6 +15,7 @@ from core.clock import naive_utc_now
 from devleadhunter_site_care.catalog import (
     FIX_LEAD_ORDER,
     WATCH_LEAD_ORDER,
+    IssueKind,
     PointKey,
     PointState,
     SiteStatus,
@@ -61,6 +62,7 @@ class SiteListing:
         with_email_count: Those with an address.
         to_fix_count: Those that deserve a message.
         written_count: Those already written to.
+        hacked_to_write_count: The sites to write to that were hacked.
         tab_counts: How many sites each tab holds.
         trades: The trade keys present, for the filter.
         matching_count: How many sites the tab and the filters match.
@@ -71,6 +73,7 @@ class SiteListing:
     with_email_count: int = 0
     to_fix_count: int = 0
     written_count: int = 0
+    hacked_to_write_count: int = 0
     tab_counts: dict[SiteTab, int] = field(default_factory=dict)
     trades: list[str] = field(default_factory=list)
     matching_count: int = 0
@@ -114,6 +117,14 @@ class SiteService:
             with_email_count=self._count(db, and_(owned, SiteCareSite.email.is_not(None))),
             to_fix_count=self._count(db, and_(owned, SiteCareSite.status == SiteStatus.TO_WRITE.value)),
             written_count=self._count(db, and_(owned, SiteCareSite.written_at.is_not(None))),
+            hacked_to_write_count=self._count(
+                db,
+                and_(
+                    owned,
+                    self.tab_filter(SiteTab.TO_WRITE),
+                    SiteCareSite.kinds_filter.like(f"%,{IssueKind.HACK.value},%"),
+                ),
+            ),
             tab_counts={each: self._count(db, and_(owned, self.tab_filter(each))) for each in SiteTab},
             trades=sorted(
                 trade_key

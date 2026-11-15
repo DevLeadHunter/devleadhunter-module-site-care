@@ -1,9 +1,4 @@
-import type {
-  SiteCareCheckedPoint,
-  SiteCarePresenter,
-  SiteCarePriceKey,
-  SiteCareWritingTrigger,
-} from './SiteCareSettings'
+import type { SiteCareCheckedPoint, SiteCarePriceKey, SiteCareWritingTrigger } from './SiteCareSettings'
 
 export type SiteCareFixedPriceField = {
   key: SiteCarePriceKey
@@ -17,10 +12,27 @@ export type SiteCareSettingsForm = {
   monthlyPriceEuros: number
   trigger: SiteCareWritingTrigger
   points: SiteCareCheckedPoint[]
-  presenter: SiteCarePresenter
+  presenterRole: string
+  presenterTagline: string
 }
 
 export type SiteCareCheckedPointFamily = {
   label: string
   points: SiteCareCheckedPoint[]
+}
+
+export type SiteCareSettingsSection = 'prices' | 'trigger' | 'points'
+
+export type SiteCareSettingsSectionTab = {
+  key: SiteCareSettingsSection
+  label: string
+  title: string
+  infoAccessibleLabel: string
+  infoText: string
+}
+
+export type SiteCareWritingTriggerOption = {
+  value: SiteCareWritingTrigger
+  label: string
+  description: string
 }

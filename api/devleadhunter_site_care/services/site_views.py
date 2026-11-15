@@ -12,7 +12,7 @@ from models.email_log import EmailLog
 from models.prospect_db import ProspectDB
 from services.prospect_search.trade_catalog import TradeCatalog
 
-from devleadhunter_site_care.catalog import KIND_LABELS, IssueKind, PointState, SiteStatus, SiteTab
+from devleadhunter_site_care.catalog import KIND_LABELS, KIND_TONES, POINT_BY_KEY, IssueKind, SiteStatus, SiteTab
 from devleadhunter_site_care.models.care_plan import SiteCarePlan
 from devleadhunter_site_care.models.sent_message import SiteCareSentMessage
 from devleadhunter_site_care.models.site import SiteCareSite
@@ -57,6 +57,11 @@ _UNREACHABLE_TEXT: str = (
     "L’adresse du site ne mène plus nulle part. C’est peut-être un prospect pour le module Sites web."
 )
 _UNREADABLE_TEXT: str = "Le site n’a pas pu être lu automatiquement. Il faut l’ouvrir à la main pour le regarder."
+_EMAIL_SOURCE_LABELS: dict[str, str] = {
+    "listing": "Trouvée dans la fiche de l’entreprise",
+    "site": "Trouvée sur son site",
+    "manual": "Saisie à la main",
+}
 _EMAIL_STATUS_LABELS: dict[str, str] = {
     EmailStatus.PENDING.value: "En cours d’envoi",
     EmailStatus.SENDING.value: "En cours d’envoi",
@@ -97,6 +102,8 @@ class SiteViews:
                 to_fix=listing.to_fix_count,
                 written=listing.written_count,
             ),
+            summary_line=self._summary_line(listing),
+            writing_queue_label=self._writing_queue_label(listing),
             tab_counts={tab.value: count for tab, count in listing.tab_counts.items()},
             trades=[TradeOption(key=key, label=TradeCatalog.resolve(key).label) for key in listing.trades],
             matching_count=listing.matching_count,
@@ -104,6 +111,7 @@ class SiteViews:
                 self._list_item(
                     site,
                     site_service.summary_of(site, settings.writing_rules),
+                    settings,
                     has_replied=site.id in replied_site_ids,
                     is_blocked=site.id in blocked_site_ids,
                     is_under_care=site.id in cared_site_ids,
@@ -130,6 +138,7 @@ class SiteViews:
         item: SiteListItem = self._list_item(
             site,
             summary,
+            settings,
             has_replied=site.id in replied_site_ids,
             is_blocked=site.id in blocked_site_ids,
             is_under_care=plan is not None,
@@ -140,13 +149,15 @@ class SiteViews:
         refusal: str | None = send_service.first_message_refusal(db, site, settings)
         return SiteDetail(
             **item.model_dump(),
+            email_source_label=_EMAIL_SOURCE_LABELS.get(site.email_source or "") if site.email else None,
             phone=site.phone,
             google_rating=site.google_rating,
             google_reviews_count=site.google_reviews_count,
             google_maps_url=site.google_maps_url,
             unread_text=self._review_text(site),
-            fixes=[self._point_view(point) for point in summary.fixes],
-            watches=[self._point_view(point) for point in summary.watches],
+            fixes=[self._point_view(point, is_watched=False) for point in summary.fixes],
+            watches=[self._point_view(point, is_watched=True) for point in summary.watches],
+            good_points=SheetLines.good_points(summary),
             good_line=SheetLines.good_line(summary),
             hidden_line=SheetLines.hidden_line(summary),
             offer=[
@@ -175,12 +186,47 @@ class SiteViews:
         )
 
     @staticmethod
+    def _summary_line(listing: SiteListing) -> str | None:
+        """« 28 sites regardés de l’extérieur. 11 méritent un message, dont 1 site piraté. », None for an empty list."""
+        if listing.total_count == 0:
+            return None
+        looked_at: str = (
+            f"{listing.total_count} sites regardés de l’extérieur."
+            if listing.total_count > 1
+            else "1 site regardé de l’extérieur."
+        )
+        to_write_count: int = listing.tab_counts.get(SiteTab.TO_WRITE, 0)
+        if to_write_count == 0:
+            return f"{looked_at} Aucun n’attend de message pour le moment."
+        to_write: str = f"{to_write_count} méritent un message" if to_write_count > 1 else "1 mérite un message"
+        hacked_count: int = listing.hacked_to_write_count
+        if hacked_count == 0:
+            return f"{looked_at} {to_write}."
+        hacked: str = f"{hacked_count} sites piratés" if hacked_count > 1 else "1 site piraté"
+        return f"{looked_at} {to_write}, dont {hacked}."
+
+    @staticmethod
+    def _writing_queue_label(listing: SiteListing) -> str | None:
+        """The label of the button that opens the sites to write one by one: « Traiter les 11 sites », None when none waits."""
+        to_write_count: int = listing.tab_counts.get(SiteTab.TO_WRITE, 0)
+        if to_write_count == 0:
+            return None
+        return f"Traiter les {to_write_count} sites" if to_write_count > 1 else "Traiter le site à écrire"
+
+    @staticmethod
     def short_day(moment: datetime) -> str:
         """A day as the state badge writes it: « 9 nov. »."""
         return f"{moment.day} {_SHORT_MONTHS[moment.month - 1]}"
 
     def _list_item(
-        self, site: SiteCareSite, summary: SiteSummary, *, has_replied: bool, is_blocked: bool, is_under_care: bool
+        self,
+        site: SiteCareSite,
+        summary: SiteSummary,
+        settings: OwnerSettings,
+        *,
+        has_replied: bool,
+        is_blocked: bool,
+        is_under_care: bool,
     ) -> SiteListItem:
         """One line of the list."""
         tab: SiteTab = site_service.tab_of(site)
@@ -197,8 +243,16 @@ class SiteViews:
             state=self._state(site, tab, has_replied=has_replied, is_blocked=is_blocked, is_under_care=is_under_care),
             lead=self._lead(site, summary),
             also=summary.also_line,
+            price_label=self._price_label(summary, settings),
             checked_at=site.checked_at,
         )
+
+    @staticmethod
+    def _price_label(summary: SiteSummary, settings: OwnerSettings) -> str | None:
+        """The price the first message names, None when the site has nothing worth a message."""
+        if summary.lead is None or summary.status != SiteStatus.TO_WRITE:
+            return None
+        return Money.label(settings.price_of(POINT_BY_KEY[summary.lead.key].correction))
 
     def _state(
         self, site: SiteCareSite, tab: SiteTab, *, has_replied: bool, is_blocked: bool, is_under_care: bool
@@ -234,13 +288,13 @@ class SiteViews:
             return SiteLead(
                 kind=IssueKind.OK.value,
                 kind_label=KIND_LABELS[IssueKind.OK],
-                tone="green",
+                tone=KIND_TONES[IssueKind.OK],
                 sentence="Tout ce qui se voit de l’extérieur est bon",
             )
         return SiteLead(
             kind=lead.kind.value,
             kind_label=KIND_LABELS[lead.kind],
-            tone="red" if lead.state == PointState.FIX else "amber",
+            tone=KIND_TONES[lead.kind],
             tech=lead.tech or None,
             sentence=lead.sentence,
         )
@@ -249,15 +303,23 @@ class SiteViews:
     def _review_lead(sentence: str) -> SiteLead:
         """The tag and the sentence of a site that waits for a look by hand."""
         return SiteLead(
-            kind=IssueKind.REVIEW.value, kind_label=KIND_LABELS[IssueKind.REVIEW], tone="amber", sentence=sentence
+            kind=IssueKind.REVIEW.value,
+            kind_label=KIND_LABELS[IssueKind.REVIEW],
+            tone=KIND_TONES[IssueKind.REVIEW],
+            sentence=sentence,
         )
 
     @staticmethod
-    def _point_view(point: SitePoint) -> SitePointView:
-        """A point of the sheet."""
+    def _point_view(point: SitePoint, *, is_watched: bool) -> SitePointView:
+        """A point of the sheet; a point to watch keeps a quiet tag."""
         kind: IssueKind = point.kind or IssueKind.REVIEW
         return SitePointView(
-            key=point.key.value, kind=kind.value, kind_label=KIND_LABELS[kind], tech=point.tech or None, fact=point.fact
+            key=point.key.value,
+            kind=kind.value,
+            kind_label=KIND_LABELS[kind],
+            tone=KIND_TONES[IssueKind.REVIEW] if is_watched else KIND_TONES[kind],
+            tech=point.tech or None,
+            fact=point.fact,
         )
 
     @staticmethod

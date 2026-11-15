@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import quote
 
-from devleadhunter_site_care.catalog import CORRECTION_BY_KEY, POINT_BY_KEY, CorrectionKey
+from devleadhunter_site_care.catalog import POINT_BY_KEY, CorrectionKey
 from devleadhunter_site_care.services.owner_settings_service import OwnerSettings, Presenter
 from devleadhunter_site_care.services.site_points import FrenchDates, SitePoint
 from devleadhunter_site_care.services.site_summary import SiteSummary
@@ -250,8 +250,7 @@ class SiteMessageWriter:
 
     def _lead_price_cents(self, lead: SitePoint) -> int | None:
         """The price of the correction that fixes the leading point."""
-        correction: CorrectionKey = POINT_BY_KEY[lead.key].correction
-        return None if CORRECTION_BY_KEY[correction].is_quoted else self._settings.prices.get(correction)
+        return self._settings.price_of(POINT_BY_KEY[lead.key].correction)
 
     def _price_sentence(self, lead: SitePoint) -> str:
         """What the correction costs, said before anything starts."""
@@ -316,6 +315,11 @@ class SheetLines:
         if count == 1:
             return f"1 point est bon : {summary.good_words[0]}."
         return f"{count} points sont bons : {', '.join(summary.good_words)}."
+
+    @staticmethod
+    def good_points(summary: SiteSummary) -> list[str]:
+        """The points that are fine, one per line of the sheet: « Le cadenas », « Aucun piratage »."""
+        return [f"{words[:1].upper()}{words[1:]}" for words in summary.good_words]
 
     @staticmethod
     def hidden_line(summary: SiteSummary) -> str | None:

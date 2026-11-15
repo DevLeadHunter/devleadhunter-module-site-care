@@ -54,6 +54,7 @@ export type SiteCareSiteState = {
   tone: SiteCareTone
 }
 
+/** One site of « Mes prospects »; `price_label` is the price the message names, null when there is nothing to write. */
 export type SiteCareSiteListItem = {
   id: number
   business_name: string
@@ -67,6 +68,7 @@ export type SiteCareSiteListItem = {
   state: SiteCareSiteState
   lead: SiteCareSiteLead
   also: string | null
+  price_label: string | null
   checked_at: string
 }
 
@@ -74,6 +76,7 @@ export type SiteCareSitePoint = {
   key: SiteCarePointKey
   kind: SiteCareIssueKind
   kind_label: string
+  tone: SiteCareTone
   tech: string | null
   fact: string
 }
@@ -104,6 +107,7 @@ export type SiteCareSiteCarePlan = {
 }
 
 export type SiteCareSiteDetail = SiteCareSiteListItem & {
+  email_source_label: string | null
   phone: string | null
   google_rating: number | null
   google_reviews_count: number | null
@@ -111,6 +115,7 @@ export type SiteCareSiteDetail = SiteCareSiteListItem & {
   unread_text: string | null
   fixes: SiteCareSitePoint[]
   watches: SiteCareSitePoint[]
+  good_points: string[]
   good_line: string | null
   hidden_line: string | null
   offer: SiteCareOfferLine[]
@@ -141,6 +146,8 @@ export type SiteCareSiteListResponse = {
   tab_counts: Record<SiteCareSiteTab, number>
   trades: SiteCareTradeFilter[]
   matching_count: number
+  summary_line: string | null
+  writing_queue_label: string | null
   sites: SiteCareSiteListItem[]
 }
 
@@ -162,6 +169,10 @@ export type SiteCareIssueKindFilter = {
 export type SiteCareSiteTabLabel = {
   key: SiteCareSiteTab
   label: string
+}
+
+export type SiteCareSiteTabCount = SiteCareSiteTabLabel & {
+  count: number
 }
 
 export type SiteCareSiteEmailUpdate = {

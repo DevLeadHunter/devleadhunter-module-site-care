@@ -1,18 +1,24 @@
 <template>
-  <div class="flex min-h-full flex-col gap-6">
-    <UiPageHeader
-      eyebrow="Entretien de sites"
-      :has-eyebrow-mark="false"
+  <div class="flex min-h-full flex-col gap-8">
+    <SiteCarePageHeader
       title="Mes prospects"
-      description="Des entreprises qui ont déjà un site. Chaque site est regardé de l’extérieur, comme un visiteur. On écrit seulement quand un point mérite une correction."
+      :description="siteList?.summary_line ?? null"
+      info-text="Des entreprises qui ont déjà un site. Chaque site est regardé de l’extérieur, comme un visiteur, et relu tous les sept jours. On écrit seulement quand un point mérite une correction."
     >
-      <template #primary-action>
-        <NuxtLink :to="SITE_CARE_SEARCH_PATH" class="btn-primary">
-          <UIcon name="i-lucide-plus" class="h-4 w-4" />
+      <template v-if="siteList !== null" #action>
+        <SiteCareButton
+          v-if="siteList.writing_queue_label !== null"
+          trailing-icon="i-lucide-arrow-right"
+          :is-loading="isOpeningWritingQueue"
+          @click="startWritingQueue"
+        >
+          {{ siteList.writing_queue_label }}
+        </SiteCareButton>
+        <SiteCareButton v-else :to="SITE_CARE_SEARCH_PATH" leading-icon="i-lucide-search">
           Nouvelle recherche
-        </NuxtLink>
+        </SiteCareButton>
       </template>
-    </UiPageHeader>
+    </SiteCarePageHeader>
 
     <UiLoader v-if="siteList === null && isLoadingSites" label="Chargement des prospects…" />
 
@@ -22,7 +28,7 @@
       description="Les prospects n’ont pas pu être chargés. Vérifiez votre connexion et réessayez."
     >
       <template #action>
-        <button type="button" class="btn-secondary" @click="loadSites">
+        <button type="button" class="app-btn-secondary" @click="loadSites">
           <UIcon name="i-lucide-refresh-cw" class="h-4 w-4" />
           Réessayer
         </button>
@@ -30,180 +36,172 @@
     </UiEmptyState>
 
     <template v-else>
-      <section class="grid grid-cols-2 gap-4 @3xl:grid-cols-4" aria-label="Chiffres du module">
-        <UiStatCard label="Total prospects" :value="siteList.counts.total" icon="i-lucide-users" />
-        <UiStatCard label="Avec email" :value="siteList.counts.with_email" icon="i-lucide-mail" />
-        <UiStatCard label="Un point à corriger" :value="siteList.counts.to_fix" icon="i-lucide-triangle-alert" />
-        <UiStatCard label="Écrits" :value="siteList.counts.written" icon="i-lucide-send" />
-      </section>
-
-      <div v-if="searchProgressLabel" class="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p class="flex min-w-0 items-center gap-2 text-sm text-[var(--app-ink-soft)]" role="status">
-          <UIcon name="i-lucide-loader-circle" class="h-4 w-4 shrink-0 animate-spin" />
+      <div
+        v-if="searchProgressLabel"
+        class="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-[var(--app-line)] bg-[var(--app-surface)] px-5 py-4"
+      >
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="h-5 w-5 shrink-0 animate-spin text-[var(--app-ink-soft)]"
+          aria-hidden="true"
+        />
+        <p class="min-w-0 flex-[999_1_16rem] text-[15px] text-[var(--app-ink)]" role="status">
           {{ searchProgressLabel }}
         </p>
-        <button
-          type="button"
-          class="btn-secondary h-9 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:h-11"
-          :disabled="isStoppingSearch"
-          @click="stopSearch"
-        >
-          <UIcon
-            :name="isStoppingSearch ? 'i-lucide-loader-circle' : 'i-lucide-square'"
-            class="h-3.5 w-3.5"
-            :class="{ 'animate-spin': isStoppingSearch }"
-          />
-          Arrêter
-        </button>
+        <SiteCareButton variant="secondary" size="small" :is-loading="isStoppingSearch" @click="stopSearch">
+          Arrêter la recherche
+        </SiteCareButton>
       </div>
       <p v-else-if="lastSearchNote" class="text-sm text-[var(--app-ink-soft)]">{{ lastSearchNote }}</p>
 
       <UiEmptyState
         v-if="siteList.counts.total === 0"
         title="Aucun prospect pour le moment"
-        description="Lancez une recherche : les entreprises qui ont déjà un site arrivent ici."
-      >
-        <template #action>
-          <NuxtLink :to="SITE_CARE_SEARCH_PATH" class="btn-primary">
-            <UIcon name="i-lucide-plus" class="h-4 w-4" />
-            Nouvelle recherche
-          </NuxtLink>
-        </template>
-      </UiEmptyState>
+        description="Lancez une recherche : les entreprises qui ont déjà un site arrivent ici, avec ce qu’on a vu sur leur site."
+      />
 
-      <section v-else class="flex flex-col gap-4">
+      <template v-else>
+        <div
+          class="flex flex-wrap gap-1.5 rounded-2xl border border-[var(--app-line)] bg-[var(--app-surface)] p-1.5"
+          role="group"
+          aria-label="Trier les prospects"
+        >
+          <button
+            v-for="tab in siteTabs"
+            :key="tab.key"
+            type="button"
+            class="flex min-h-14 flex-[1_1_30%] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[15px] whitespace-nowrap transition-colors @lg:flex-row @lg:gap-2.5 @lg:px-3 @lg:text-base @4xl:flex-1"
+            :class="
+              tab.key === activeTab
+                ? 'bg-[var(--app-btn-bg)] font-semibold text-[var(--app-btn-text)]'
+                : 'font-medium text-[var(--app-ink-soft)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-ink)]'
+            "
+            :aria-pressed="tab.key === activeTab"
+            @click="selectTab(tab.key)"
+          >
+            {{ tab.label }}
+            <span
+              class="min-w-7 rounded-full px-2 py-0.5 text-center text-sm font-semibold"
+              :class="
+                tab.key === activeTab
+                  ? 'bg-[color-mix(in_srgb,var(--app-btn-text)_18%,transparent)] text-[var(--app-btn-text)]'
+                  : 'bg-[var(--app-surface-2)] text-[var(--app-ink-soft)]'
+              "
+            >
+              {{ tab.count }}
+            </span>
+          </button>
+        </div>
+
         <div class="flex flex-wrap gap-3">
           <div class="relative min-w-0 flex-[999_1_16rem]">
             <UIcon
               name="i-lucide-search"
-              class="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-[var(--app-faint)]"
+              class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-[var(--app-ink-soft)]"
+              aria-hidden="true"
             />
             <input
               v-model="searchText"
               type="search"
               placeholder="Nom, ville, adresse du site"
               aria-label="Rechercher un prospect"
-              class="app-input pl-9"
+              class="app-input h-12 min-h-12 rounded-full pr-4 pl-11 text-[15px]"
             />
           </div>
-          <div class="min-w-0 flex-[1_1_12.5rem]">
-            <UiSelectField v-model="tradeFilter" :options="tradeOptions" aria-label="Filtrer par métier" />
-          </div>
-          <div class="min-w-0 flex-[1_1_12.5rem]">
+          <div class="min-w-0 flex-[1_1_14rem] @2xl:max-w-72">
             <UiSelectField
               v-model="issueKindFilter"
               :options="ISSUE_KIND_OPTIONS"
               aria-label="Filtrer par type de souci"
+              class="h-12 min-h-12 rounded-full px-[18px] text-[15px] font-medium"
             />
           </div>
         </div>
 
-        <div class="border-b border-[var(--app-line)]">
-          <UiFilterTabs :model-value="activeTab" :tabs="siteTabs" @update:model-value="selectTab" />
-        </div>
-
         <div
-          class="app-card overflow-hidden transition-opacity"
+          class="grid grid-cols-1 gap-5 transition-opacity @3xl:grid-cols-2"
           :class="{ 'opacity-60': isLoadingSites }"
           :aria-busy="isLoadingSites"
         >
-          <div
-            class="hidden gap-4 bg-[var(--app-surface-2)] px-5 py-3 @2xl:grid @2xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.9fr)_minmax(0,1fr)_7.25rem] @2xl:items-center"
+          <SiteCareLinkCard
+            v-for="listedSite in sites"
+            :key="listedSite.id"
+            :to="`${SITE_CARE_SITES_PATH}/${listedSite.id}`"
           >
-            <span class="app-label">Entreprise</span>
-            <span class="app-label">Ce qu’on a vu sur son site</span>
-            <span class="app-label">Email</span>
-            <span class="app-label text-right">État</span>
-          </div>
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+              <SiteCareIssueTag
+                :kind="listedSite.lead.kind"
+                :label="listedSite.lead.kind_label"
+                :tone="listedSite.lead.tone"
+              />
+              <SiteCareTechnologyChip v-if="listedSite.lead.tech" :technology="listedSite.lead.tech" />
+            </div>
+            <h2 class="text-lg leading-snug font-semibold tracking-[-0.01em] text-[var(--app-ink)]">
+              {{ listedSite.lead.sentence }}
+            </h2>
+            <p v-if="listedSite.also" class="mt-1.5 text-sm text-[var(--app-ink-soft)]">{{ listedSite.also }}</p>
 
-          <ul>
-            <li
-              v-for="listedSite in sites"
-              :key="listedSite.id"
-              class="grid gap-2.5 border-t border-[var(--app-line)] p-5 first:border-t-0 @2xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.9fr)_minmax(0,1fr)_7.25rem] @2xl:items-center @2xl:gap-4 @2xl:first:border-t"
-            >
-              <button
-                type="button"
-                class="block w-full min-w-0 rounded text-left focus-visible:ring-2 focus-visible:ring-[var(--app-ink-soft)] focus-visible:outline-none"
-                @click="openSiteSheet(listedSite.id)"
-              >
-                <span class="block text-[15px] font-semibold text-[var(--app-ink)]">{{
-                  listedSite.business_name
-                }}</span>
-                <span class="mt-0.5 block text-[13px] text-[var(--app-ink-soft)]">
-                  {{ listedSite.trade_label }} · {{ listedSite.city }}
+            <div class="mt-auto pt-4">
+              <div class="flex items-center gap-3 border-t border-[var(--app-line)] pt-4">
+                <span
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-surface-2)] text-[13px] font-semibold text-[var(--app-ink-soft)]"
+                  aria-hidden="true"
+                >
+                  {{ SiteCareBusinessLabels.initialsOf(listedSite.business_name) }}
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate font-semibold text-[var(--app-ink)]">{{ listedSite.business_name }}</span>
+                  <span class="block truncate text-sm text-[var(--app-ink-soft)]">
+                    {{ SiteCareBusinessLabels.placeOf(listedSite.trade_label, listedSite.city) }}
+                  </span>
+                </span>
+                <span v-if="isOfferShown(listedSite)" class="shrink-0 text-right">
+                  <span class="block text-[19px] leading-tight font-semibold text-[var(--app-ink)]">
+                    {{ listedSite.price_label }}
+                  </span>
+                  <span class="block text-[13px] font-medium text-[var(--app-ink-soft)]">à proposer</span>
                 </span>
                 <span
-                  class="block font-[family-name:var(--app-font-mono)] text-xs break-words text-[var(--app-ink-soft)]"
+                  v-else
+                  class="inline-flex shrink-0 items-center rounded-full px-3 py-1 text-[13px] font-medium whitespace-nowrap"
+                  :class="SITE_CARE_TONE_CLASSES[listedSite.state.tone]"
                 >
-                  {{ listedSite.domain }}
-                </span>
-              </button>
-
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <SiteCareIssueTag
-                    :kind="listedSite.lead.kind"
-                    :label="listedSite.lead.kind_label"
-                    :tone="listedSite.lead.tone"
-                  />
-                  <SiteCareTechnologyChip v-if="listedSite.lead.tech" :technology="listedSite.lead.tech" />
-                </div>
-                <p class="mt-1.5 text-[15px] leading-snug text-[var(--app-ink)]">{{ listedSite.lead.sentence }}</p>
-                <p v-if="listedSite.also" class="mt-0.5 text-[13px] text-[var(--app-ink-soft)]">
-                  {{ listedSite.also }}
-                </p>
-              </div>
-
-              <p
-                class="min-w-0 font-[family-name:var(--app-font-mono)] text-[13px] break-words text-[var(--app-ink-soft)]"
-              >
-                {{ listedSite.email ?? 'Pas d’email connu' }}
-              </p>
-
-              <div class="@2xl:justify-self-end @2xl:text-right">
-                <span class="app-badge whitespace-nowrap" :class="SITE_CARE_TONE_BADGE_CLASSES[listedSite.state.tone]">
                   {{ listedSite.state.label }}
                 </span>
               </div>
-            </li>
-          </ul>
-
-          <p v-if="sites.length === 0" class="px-5 py-4 text-[13px] text-[var(--app-ink-soft)]">
-            Aucun prospect ne correspond à ce tri.
-          </p>
-
-          <div
-            v-if="hasMoreSites"
-            class="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-line)] px-5 py-4"
-          >
-            <p class="text-[13px] text-[var(--app-ink-soft)]">
-              {{ sites.length }} prospects affichés sur
-              {{ siteList.matching_count }}
-            </p>
-            <button
-              type="button"
-              class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="isLoadingMoreSites"
-              @click="loadMoreSites"
-            >
-              <UIcon v-if="isLoadingMoreSites" name="i-lucide-loader-circle" class="h-4 w-4 animate-spin" />
-              Afficher plus
-            </button>
-          </div>
+            </div>
+          </SiteCareLinkCard>
         </div>
-      </section>
+
+        <p
+          v-if="sites.length === 0 && !isLoadingSites"
+          class="rounded-2xl border border-dashed border-[var(--app-line)] p-8 text-center text-[var(--app-ink-soft)]"
+        >
+          Aucun prospect ne correspond à ce tri.
+        </p>
+        <p v-else-if="sites.length > 0" class="text-sm text-[var(--app-ink-soft)]">
+          {{ SITE_CARE_SITE_TAB_HINTS[activeTab] }}
+        </p>
+
+        <div v-if="hasMoreSites" class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm text-[var(--app-ink-soft)]">
+            {{ sites.length }} prospects affichés sur {{ siteList.matching_count }}
+          </p>
+          <SiteCareButton variant="secondary" size="small" :is-loading="isLoadingMoreSites" @click="loadMoreSites">
+            Afficher plus
+          </SiteCareButton>
+        </div>
+      </template>
     </template>
   </div>
 </template>
 
 <script lang="ts" setup>
 import type { ComputedRef, Ref } from 'vue'
-import type { LocationQueryValue } from 'vue-router'
+import type { LocationQueryRaw, LocationQueryValue } from 'vue-router'
 import type { UseToastReturn } from '~/types/Composables'
 import type { SelectFieldOption } from '~/types/SelectField'
-import type { UiFilterTab } from '~/types/UiFilterTabs'
-import type { UseSiteCareSiteChangesReturn } from '../../../composables/useSiteCareSiteChanges'
+import type { UseSiteCareWritingQueueReturn } from '../../../composables/useSiteCareWritingQueue'
 import type { SiteCareSearch } from '../../../types/SiteCareSearch'
 import type {
   SiteCareIssueKind,
@@ -212,35 +210,42 @@ import type {
   SiteCareSiteListQuery,
   SiteCareSiteListResponse,
   SiteCareSiteTab,
+  SiteCareSiteTabCount,
   SiteCareSiteTabLabel,
-  SiteCareTradeFilter,
 } from '../../../types/SiteCareSite'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useToast } from '~/composables/useToast'
-import { useDrawerStackStore } from '~/stores/drawerStack'
 import { parseApiDate } from '~/utils/date'
-import { useSiteCareSiteChanges } from '../../../composables/useSiteCareSiteChanges'
+import { useSiteCareWritingQueue } from '../../../composables/useSiteCareWritingQueue'
 import {
   SITE_CARE_ISSUE_KIND_FILTERS,
+  SITE_CARE_SITE_TAB_HINTS,
   SITE_CARE_SITE_TABS,
-  SITE_CARE_TONE_BADGE_CLASSES,
+  SITE_CARE_TONE_CLASSES,
 } from '../../../constants/siteCareLabels'
-import { SITE_CARE_SEARCH_PATH } from '../../../constants/siteCareModule'
+import {
+  SITE_CARE_SEARCH_PATH,
+  SITE_CARE_SITE_LIST_MAXIMUM_LIMIT,
+  SITE_CARE_SITES_PATH,
+  SITE_CARE_WRITING_QUEUE_QUERY,
+} from '../../../constants/siteCareModule'
 import { SiteCareService } from '../../../services/siteCareService'
+import { SiteCareBusinessLabels } from '../../../utils/siteCareBusinessLabels'
 
 definePageMeta({ layout: 'dashboard', middleware: ['auth', 'site-care-module'] })
 
 useSeoMeta({ title: 'Mes prospects · DevLeadHunter' })
 
 const route: ReturnType<typeof useRoute> = useRoute()
+const router: ReturnType<typeof useRouter> = useRouter()
 const toast: UseToastReturn = useToast()
-const drawerStack: ReturnType<typeof useDrawerStackStore> = useDrawerStackStore()
-const { siteChangeCount }: UseSiteCareSiteChangesReturn = useSiteCareSiteChanges()
+const { loadQueue }: UseSiteCareWritingQueueReturn = useSiteCareWritingQueue()
 
-const ALL_FILTER_VALUE: string = 'all'
+const ALL_KINDS_VALUE: string = 'all'
+
+const DEFAULT_TAB: SiteCareSiteTab = 'to_write'
 
 const SITE_PAGE_SIZE: number = 100
-const SITE_LIST_MAXIMUM_LIMIT: number = 500
 
 const SEARCH_TEXT_DEBOUNCE_MS: number = 300
 
@@ -249,7 +254,7 @@ const SEARCH_PROGRESS_REFRESH_INTERVAL_MS: number = 5000
 const LAST_SEARCH_NOTE_LIFETIME_MS: number = 24 * 60 * 60 * 1000
 
 const ISSUE_KIND_OPTIONS: SelectFieldOption[] = [
-  { value: ALL_FILTER_VALUE, label: 'Tous les soucis' },
+  { value: ALL_KINDS_VALUE, label: 'Tous les soucis' },
   ...SITE_CARE_ISSUE_KIND_FILTERS.map(
     (filter: SiteCareIssueKindFilter): SelectFieldOption => ({ value: filter.kind, label: filter.label }),
   ),
@@ -259,35 +264,28 @@ const siteList: Ref<SiteCareSiteListResponse | null> = ref(null)
 const sites: Ref<SiteCareSiteListItem[]> = ref([])
 const isLoadingSites: Ref<boolean> = ref(true)
 const isLoadingMoreSites: Ref<boolean> = ref(false)
-const activeTab: Ref<SiteCareSiteTab> = ref(parseSiteTab(firstQueryValue(route.query.tab)) ?? 'to_write')
-const tradeFilter: Ref<string> = ref(ALL_FILTER_VALUE)
-const issueKindFilter: Ref<string> = ref(parseIssueKind(firstQueryValue(route.query.kind)) ?? ALL_FILTER_VALUE)
+const activeTab: Ref<SiteCareSiteTab> = ref(parseSiteTab(firstQueryValue(route.query.tab)) ?? DEFAULT_TAB)
+const issueKindFilter: Ref<string> = ref(parseIssueKind(firstQueryValue(route.query.kind)) ?? ALL_KINDS_VALUE)
 const searchText: Ref<string> = ref('')
 const appliedSearchText: Ref<string> = ref('')
 const currentSearch: Ref<SiteCareSearch | null> = ref(null)
 const isStoppingSearch: Ref<boolean> = ref(false)
+const isOpeningWritingQueue: Ref<boolean> = ref(false)
 
 let latestSiteRequestNumber: number = 0
 let searchTextTimer: ReturnType<typeof setTimeout> | null = null
 let searchProgressTimer: ReturnType<typeof setTimeout> | null = null
 let hasLeftPage: boolean = false
 
-const siteTabs: ComputedRef<UiFilterTab[]> = computed((): UiFilterTab[] =>
+const siteTabs: ComputedRef<SiteCareSiteTabCount[]> = computed((): SiteCareSiteTabCount[] =>
   SITE_CARE_SITE_TABS.map(
-    (tab: SiteCareSiteTabLabel): UiFilterTab => ({
+    (tab: SiteCareSiteTabLabel): SiteCareSiteTabCount => ({
       key: tab.key,
       label: tab.label,
-      count: siteList.value?.tab_counts[tab.key],
+      count: siteList.value?.tab_counts[tab.key] ?? 0,
     }),
   ),
 )
-
-const tradeOptions: ComputedRef<SelectFieldOption[]> = computed((): SelectFieldOption[] => [
-  { value: ALL_FILTER_VALUE, label: 'Tous les métiers' },
-  ...(siteList.value?.trades ?? []).map(
-    (trade: SiteCareTradeFilter): SelectFieldOption => ({ value: trade.key, label: trade.label }),
-  ),
-])
 
 const hasMoreSites: ComputedRef<boolean> = computed(
   (): boolean => siteList.value !== null && siteList.value.matching_count > sites.value.length,
@@ -325,11 +323,14 @@ function firstQueryValue(value: LocationQueryValue | LocationQueryValue[] | unde
 }
 
 /**
- * Read a tab of the list from a raw value.
+ * Read a tab of the list from a raw value; `all` is accepted, the watch's links open it.
  * @param value - The value to read.
  * @returns The tab, or null when the value names none.
  */
 function parseSiteTab(value: string | null): SiteCareSiteTab | null {
+  if (value === 'all') {
+    return 'all'
+  }
   return SITE_CARE_SITE_TABS.find((tab: SiteCareSiteTabLabel): boolean => tab.key === value)?.key ?? null
 }
 
@@ -355,6 +356,15 @@ function parseSiteId(value: string | null): number | null {
 }
 
 /**
+ * Whether a card shows the price to offer rather than its state: only while the site waits for its message.
+ * @param listedSite - The site of the card.
+ * @returns True for a site to write that has a price.
+ */
+function isOfferShown(listedSite: SiteCareSiteListItem): boolean {
+  return listedSite.state.key === 'to_write' && listedSite.price_label !== null
+}
+
+/**
  * The query of the list for the tab and filters on screen.
  * @param limit - How many rows to ask.
  * @param offset - How many rows to skip.
@@ -363,7 +373,7 @@ function parseSiteId(value: string | null): number | null {
 function siteListQuery(limit: number, offset: number): SiteCareSiteListQuery {
   return {
     tab: activeTab.value,
-    trade: tradeFilter.value === ALL_FILTER_VALUE ? null : tradeFilter.value,
+    trade: null,
     kind: parseIssueKind(issueKindFilter.value),
     q: appliedSearchText.value === '' ? null : appliedSearchText.value,
     limit,
@@ -405,8 +415,7 @@ async function loadSites(): Promise<void> {
 }
 
 /**
- * Read again the rows on screen and the counts, without a loader: after an action of the sheet, or while a search
- * brings new prospects.
+ * Read again the rows on screen and the counts, without a loader, while a search brings new prospects.
  * @returns A promise resolved once the list is up to date; a failure leaves the list as it is.
  */
 async function refreshSites(): Promise<void> {
@@ -415,7 +424,10 @@ async function refreshSites(): Promise<void> {
   }
   latestSiteRequestNumber += 1
   const requestNumber: number = latestSiteRequestNumber
-  const shownSiteCount: number = Math.min(Math.max(sites.value.length, SITE_PAGE_SIZE), SITE_LIST_MAXIMUM_LIMIT)
+  const shownSiteCount: number = Math.min(
+    Math.max(sites.value.length, SITE_PAGE_SIZE),
+    SITE_CARE_SITE_LIST_MAXIMUM_LIMIT,
+  )
   try {
     const response: SiteCareSiteListResponse = await SiteCareService.listSites(siteListQuery(shownSiteCount, 0))
     if (requestNumber === latestSiteRequestNumber) {
@@ -461,21 +473,45 @@ async function loadMoreSites(): Promise<void> {
 
 /**
  * Switch the list to another tab.
- * @param tabKey - The key of the tab clicked.
+ * @param tab - The tab clicked.
  */
-function selectTab(tabKey: string): void {
-  const tab: SiteCareSiteTab | null = parseSiteTab(tabKey)
-  if (tab !== null) {
-    activeTab.value = tab
+function selectTab(tab: SiteCareSiteTab): void {
+  activeTab.value = tab
+}
+
+/** Keep the tab and the type of issue in the address, so coming back from a site lands on the same list. */
+function writeFiltersInAddress(): void {
+  const query: LocationQueryRaw = {}
+  if (activeTab.value !== DEFAULT_TAB) {
+    query.tab = activeTab.value
   }
+  const issueKind: SiteCareIssueKind | null = parseIssueKind(issueKindFilter.value)
+  if (issueKind !== null) {
+    query.kind = issueKind
+  }
+  router.replace({ query })
 }
 
 /**
- * Open the sheet of a prospect in the drawer stack.
- * @param siteId - The site to open.
+ * Start « Traiter les sites »: queue the sites of « À écrire » in their order, then open the first.
+ * @returns A promise resolved once the first site's page is opened, or the failure is shown.
  */
-function openSiteSheet(siteId: number): void {
-  drawerStack.push({ kind: 'site-care-site', siteId })
+async function startWritingQueue(): Promise<void> {
+  isOpeningWritingQueue.value = true
+  try {
+    const queuedSiteIds: number[] = await loadQueue()
+    const firstSiteId: number | undefined = queuedSiteIds[0]
+    if (firstSiteId === undefined) {
+      toast.info('Plus aucun site n’attend de message.')
+      await loadSites()
+      return
+    }
+    await navigateTo({ path: `${SITE_CARE_SITES_PATH}/${firstSiteId}`, query: SITE_CARE_WRITING_QUEUE_QUERY })
+  } catch {
+    toast.error('Les sites à écrire n’ont pas pu être chargés.')
+  } finally {
+    isOpeningWritingQueue.value = false
+  }
 }
 
 /**
@@ -545,23 +581,18 @@ watch(
 )
 
 watch(
-  (): string => [activeTab.value, tradeFilter.value, issueKindFilter.value, appliedSearchText.value].join('\n'),
+  (): string => [activeTab.value, issueKindFilter.value, appliedSearchText.value].join('\n'),
   (): void => {
+    writeFiltersInAddress()
     loadSites()
   },
 )
 
-watch(
-  (): number => siteChangeCount.value,
-  (): void => {
-    refreshSites()
-  },
-)
-
 onMounted(async (): Promise<void> => {
-  const requestedSiteId: number | null = parseSiteId(firstQueryValue(route.query.site))
-  if (requestedSiteId !== null) {
-    openSiteSheet(requestedSiteId)
+  const siteIdOfOldSheetLink: number | null = parseSiteId(firstQueryValue(route.query.site))
+  if (siteIdOfOldSheetLink !== null) {
+    await navigateTo(`${SITE_CARE_SITES_PATH}/${siteIdOfOldSheetLink}`, { replace: true })
+    return
   }
   await Promise.all([loadSites(), refreshSearchProgress()])
   if (!hasLeftPage && isSearchRunning.value) {

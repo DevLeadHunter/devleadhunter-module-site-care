@@ -1,4 +1,4 @@
-"""« Réglages »: the user's prices, writing rules, points looked at and presentation."""
+"""« Réglages »: the user's prices, writing rules, points looked at and the two lines that present him."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ async def save_settings(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> OwnerSettingsView:
-    """Store the user's settings and apply his writing rules to the sites already checked."""
+    """Store the user's settings and apply his writing rules to the sites already checked; his profile is not touched."""
     current: OwnerSettings = owner_settings_service.get(db, current_user.id)
     prices: dict[CorrectionKey, int | None] = dict(current.prices)
     for line in body.prices:
@@ -100,13 +100,7 @@ async def save_settings(
             disabled_points=frozenset(
                 PointKey(point.key) for point in body.points if point.key in POINT_KEY_VALUES and not point.is_enabled
             ),
-            presenter=Presenter(
-                name=body.presenter.name,
-                role=body.presenter.role,
-                tagline=body.presenter.tagline,
-                site_url=body.presenter.site_url,
-                photo_url=body.presenter.photo_url,
-            ),
+            presenter=Presenter(role=body.presenter.role, tagline=body.presenter.tagline),
         ),
     )
     site_service.apply_rules_to_all(db, current_user.id, saved.writing_rules)

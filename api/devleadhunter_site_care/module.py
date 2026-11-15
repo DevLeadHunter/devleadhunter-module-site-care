@@ -134,7 +134,7 @@ class SiteCareModule(ProductModule):
                     if click_wording is not None
                     else f"{self.notification_tag} · a ouvert la page préparée pour lui"
                 ),
-                url=f"/dashboard/site-care?tab=all&site={site.id}",
+                url=f"/dashboard/site-care/sites/{site.id}",
                 tag=f"site-care-page-{site.id}",
             )
         except Exception:

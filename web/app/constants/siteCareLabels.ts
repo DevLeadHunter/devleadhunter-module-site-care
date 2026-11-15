@@ -1,6 +1,7 @@
 import type {
   SiteCareIssueKindFilter,
   SiteCareLeadKind,
+  SiteCareSiteTab,
   SiteCareSiteTabLabel,
   SiteCareTone,
 } from '../types/SiteCareSite'
@@ -37,14 +38,22 @@ export const SITE_CARE_SITE_TABS: SiteCareSiteTabLabel[] = [
   { key: 'no_email', label: 'Sans email' },
   { key: 'nothing', label: 'Rien à signaler' },
   { key: 'review', label: 'À revoir' },
-  { key: 'all', label: 'Tous' },
 ]
 
-export const SITE_CARE_TONE_BADGE_CLASSES: Record<SiteCareTone, string> = {
-  red: 'app-badge--danger',
-  amber: 'app-badge--progress',
-  green: 'app-badge--success',
-  violet: 'app-badge--engaged',
-  ink: 'app-badge--strong',
-  neutral: '',
+export const SITE_CARE_SITE_TAB_HINTS: Record<SiteCareSiteTab, string> = {
+  to_write: 'Du plus grave au plus léger.',
+  written: 'L’ouverture et la réponse sont détectées toutes seules.',
+  no_email: 'Ouvrez un prospect pour chercher son adresse sur son site, ou la saisir.',
+  nothing: 'On ne leur écrit pas : leur site est relu tous les sept jours.',
+  review: 'Ces sites seront relus au prochain contrôle.',
+  all: 'Tous vos prospects, tous onglets confondus.',
+}
+
+export const SITE_CARE_TONE_CLASSES: Record<SiteCareTone, string> = {
+  red: 'bg-[var(--app-red-soft)] text-[var(--app-red)]',
+  amber: 'bg-[var(--app-accent-soft)] text-[var(--app-accent-ink)]',
+  green: 'bg-[var(--app-green-soft)] text-[var(--app-green)]',
+  violet: 'bg-[var(--app-violet-soft)] text-[var(--app-violet)]',
+  ink: 'bg-[var(--app-ink)] text-[var(--app-bg)]',
+  neutral: 'bg-[var(--app-surface-2)] text-[var(--app-ink-soft)]',
 }

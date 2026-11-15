@@ -1,10 +1,22 @@
 <template>
-  <div class="max-w-3xl space-y-6">
-    <UiPageHeader
-      eyebrow="Paramètres"
+  <div class="flex max-w-4xl flex-col gap-7">
+    <SiteCarePageHeader
       title="Entretien de sites"
-      description="Vos prix, ce qui est regardé sur chaque site, et à partir de quand on écrit."
-    />
+      description="Vos prix, quand écrire, et ce qui est regardé sur chaque site."
+    >
+      <template v-if="form !== null" #action>
+        <SiteCareButton v-if="hasUnsavedChanges" :is-disabled="!canSave" :is-loading="isSaving" @click="saveSettings">
+          Enregistrer
+        </SiteCareButton>
+        <span
+          v-else
+          class="inline-flex min-h-12 items-center rounded-full bg-[var(--app-surface-2)] px-[22px] text-[15px] font-medium text-[var(--app-ink-soft)]"
+          role="status"
+        >
+          À jour
+        </span>
+      </template>
+    </SiteCarePageHeader>
 
     <UiLoader v-if="isLoadingSettings" label="Chargement des réglages…" />
 
@@ -14,7 +26,7 @@
       description="Les réglages n’ont pas pu être chargés. Vérifiez votre connexion et réessayez."
     >
       <template #action>
-        <button type="button" class="btn-secondary" @click="loadSettings">
+        <button type="button" class="app-btn-secondary" @click="loadSettings">
           <UIcon name="i-lucide-refresh-cw" class="h-4 w-4" />
           Réessayer
         </button>
@@ -22,19 +34,56 @@
     </UiEmptyState>
 
     <template v-else>
-      <section class="app-card p-5 @2xl:p-6">
-        <h2 class="text-base font-semibold text-[var(--app-ink)]">Prix des corrections</h2>
-        <p class="mt-1 text-sm text-[var(--app-ink-soft)]">Annoncés dans le message, avant de commencer.</p>
-        <ul class="mt-4 divide-y divide-[var(--app-line)]">
+      <p v-if="saveProblemMessage" class="-mt-3 text-sm text-[var(--app-red)]" role="alert">{{ saveProblemMessage }}</p>
+
+      <div
+        class="flex flex-wrap gap-1 border-b border-[var(--app-line)]"
+        role="tablist"
+        aria-label="Sections des réglages"
+      >
+        <button
+          v-for="sectionTab in SETTINGS_SECTION_TABS"
+          :key="sectionTab.key"
+          type="button"
+          role="tab"
+          :aria-selected="sectionTab.key === activeSection"
+          class="min-h-12 cursor-pointer px-[18px] text-base transition-colors"
+          :class="
+            sectionTab.key === activeSection
+              ? 'font-semibold text-[var(--app-ink)] shadow-[inset_0_-2px_0_var(--app-ink)]'
+              : 'font-medium text-[var(--app-ink-soft)] hover:text-[var(--app-ink)]'
+          "
+          @click="activeSection = sectionTab.key"
+        >
+          {{ sectionTab.label }}
+        </button>
+      </div>
+
+      <section
+        class="flex flex-col gap-6 rounded-2xl border border-[var(--app-line)] bg-[var(--app-surface)] p-6 @2xl:p-8"
+        role="tabpanel"
+        :aria-labelledby="SECTION_TITLE_ID"
+      >
+        <div class="flex items-center gap-0.5">
+          <h2 :id="SECTION_TITLE_ID" class="text-xl font-semibold tracking-[-0.01em] text-[var(--app-ink)]">
+            {{ activeSectionTab.title }}
+          </h2>
+          <SiteCareInfoTip
+            :accessible-label="activeSectionTab.infoAccessibleLabel"
+            :info-text="activeSectionTab.infoText"
+          />
+        </div>
+
+        <ul v-if="activeSection === 'prices'" class="flex flex-col">
           <li
             v-for="price in form.fixedPrices"
             :key="price.key"
-            class="flex items-center justify-between gap-4 py-3 first:pt-0"
+            class="flex min-h-[68px] items-center justify-between gap-4 border-t border-[var(--app-line)] py-2.5 first:border-t-0"
           >
-            <label :for="`site-care-price-${price.key}`" class="min-w-0 text-[15px] text-[var(--app-ink)]">
+            <label :for="`site-care-price-${price.key}`" class="min-w-0 text-base text-[var(--app-ink)]">
               {{ price.label }}
             </label>
-            <span class="flex shrink-0 items-center gap-2 text-sm text-[var(--app-ink-soft)]">
+            <span class="flex shrink-0 items-center gap-2.5">
               <input
                 :id="`site-care-price-${price.key}`"
                 v-model.number="price.euros"
@@ -42,14 +91,18 @@
                 inputmode="numeric"
                 min="0"
                 step="10"
-                class="app-input w-24 text-right"
+                class="app-input h-12 w-24 rounded-xl text-right text-base font-semibold"
               />
-              €
+              <span class="w-4 text-[15px] text-[var(--app-ink-soft)]">€</span>
             </span>
           </li>
-          <li class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-            <label for="site-care-monthly-price" class="min-w-0 text-[15px] text-[var(--app-ink)]">Suivi mensuel</label>
-            <span class="flex shrink-0 items-center gap-2 text-sm text-[var(--app-ink-soft)]">
+          <li
+            class="flex min-h-[68px] items-center justify-between gap-4 border-t border-[var(--app-line)] py-2.5 first:border-t-0"
+          >
+            <label for="site-care-monthly-price" class="min-w-0 text-base text-[var(--app-ink)]">
+              Suivi mensuel, par mois
+            </label>
+            <span class="flex shrink-0 items-center gap-2.5">
               <input
                 id="site-care-monthly-price"
                 v-model.number="form.monthlyPriceEuros"
@@ -57,176 +110,162 @@
                 inputmode="numeric"
                 min="0"
                 step="10"
-                class="app-input w-24 text-right"
+                class="app-input h-12 w-24 rounded-xl text-right text-base font-semibold"
               />
-              € par mois
+              <span class="w-4 text-[15px] text-[var(--app-ink-soft)]">€</span>
             </span>
           </li>
           <li
             v-for="price in quotedPrices"
             :key="price.key"
-            class="flex min-h-11 items-center justify-between gap-4 py-3 last:pb-0"
+            class="flex min-h-[68px] items-center justify-between gap-4 border-t border-[var(--app-line)] py-2.5"
           >
-            <span class="min-w-0 text-[15px] text-[var(--app-ink)]">{{ price.label }}</span>
-            <span class="app-badge shrink-0 whitespace-nowrap">Sur devis</span>
+            <span class="min-w-0 text-base text-[var(--app-ink)]">{{ price.label }}</span>
+            <span
+              class="inline-flex shrink-0 items-center rounded-full bg-[var(--app-surface-2)] px-3 py-1 text-[13px] font-medium text-[var(--app-ink-soft)]"
+            >
+              Sur devis
+            </span>
           </li>
         </ul>
-      </section>
 
-      <section class="app-card p-5 @2xl:p-6">
-        <h2 id="site-care-trigger-title" class="text-base font-semibold text-[var(--app-ink)]">Quand écrire</h2>
-        <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-          Un site sans rien à corriger reste dans « Rien à signaler » : on ne lui écrit pas.
-        </p>
-        <UiRadioCardGroup
-          v-model="form.trigger"
-          :options="WRITING_TRIGGER_OPTIONS"
-          labelled-by="site-care-trigger-title"
-          class="mt-4"
-        />
-      </section>
-
-      <section class="app-card p-5 @2xl:p-6">
-        <h2 class="text-base font-semibold text-[var(--app-ink)]">Ce qui est regardé sur chaque site</h2>
-        <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-          Seulement ce que voit un visiteur : la page d’accueil et les réglages publics du nom de domaine.
-        </p>
-        <div v-for="family in checkedPointFamilies" :key="family.label" class="mt-5">
-          <h3 class="app-label">{{ family.label }}</h3>
-          <ul class="mt-1 divide-y divide-[var(--app-line)]">
-            <li
-              v-for="point in family.points"
-              :key="point.key"
-              class="flex min-h-11 items-center justify-between gap-4 py-2"
-            >
-              <label :for="`site-care-point-${point.key}`" class="min-w-0 flex-1 text-[15px] text-[var(--app-ink)]">
-                {{ point.label }}
-              </label>
-              <UiSwitch :id="`site-care-point-${point.key}`" v-model="point.is_enabled" />
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="app-card p-5 @2xl:p-6">
-        <h2 class="text-base font-semibold text-[var(--app-ink)]">Qui écrit</h2>
-        <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-          Le message et la page préparée pour le prospect vous présentent avec ces informations.
-        </p>
-        <div class="mt-4 grid gap-4 @2xl:grid-cols-2">
-          <label class="block">
-            <span class="app-label mb-1.5 block">Nom</span>
-            <input v-model="form.presenter.name" type="text" autocomplete="name" class="app-input" />
-          </label>
-          <label class="block">
-            <span class="app-label mb-1.5 block">Adresse du site</span>
-            <input
-              v-model="form.presenter.site_url"
-              type="url"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://"
-              class="app-input"
+        <template v-else-if="activeSection === 'trigger'">
+          <div class="flex flex-col" role="radiogroup" :aria-labelledby="SECTION_TITLE_ID">
+            <SiteCareChoiceRow
+              v-for="triggerOption in WRITING_TRIGGER_OPTIONS"
+              :key="triggerOption.value"
+              :title="triggerOption.label"
+              :description="triggerOption.description"
+              :is-selected="form.trigger === triggerOption.value"
+              @click="form.trigger = triggerOption.value"
             />
-          </label>
-          <label class="block @2xl:col-span-2">
-            <span class="app-label mb-1.5 block">Votre métier, après « Je suis {{ presenterNameExample }}, »</span>
-            <input
-              v-model="form.presenter.role"
-              type="text"
-              autocomplete="off"
+          </div>
+
+          <div class="flex flex-col gap-5 border-t border-[var(--app-line)] pt-6">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+              <img
+                v-if="profilePhotoObjectUrl"
+                :src="profilePhotoObjectUrl"
+                alt=""
+                class="h-12 w-12 shrink-0 rounded-full border border-[var(--app-line)] object-cover"
+              />
+              <span
+                v-else
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--app-surface-2)] text-[15px] font-semibold text-[var(--app-ink-soft)]"
+                aria-hidden="true"
+              >
+                {{ SiteCareBusinessLabels.initialsOf(savedSettings.presenter.name) }}
+              </span>
+              <div class="min-w-0 flex-[999_1_10rem]">
+                <span class="block text-base font-semibold text-[var(--app-ink)]">Signé avec votre profil</span>
+                <span class="block text-sm text-[var(--app-ink-soft)]">{{ profileLine }}</span>
+              </div>
+              <SiteCareButton variant="secondary" size="small" @click="openProfile">Modifier mon profil</SiteCareButton>
+            </div>
+            <SiteCareTextField
+              v-model="form.presenterRole"
+              :field-label="`Votre métier, après « Je suis ${presenterName}, »`"
               placeholder="développeur web à Rennes"
-              class="app-input"
             />
-          </label>
-          <label class="block @2xl:col-span-2">
-            <span class="app-label mb-1.5 block">Présentation en une ligne</span>
-            <input v-model="form.presenter.tagline" type="text" autocomplete="off" class="app-input" />
-          </label>
-          <label class="block @2xl:col-span-2">
-            <span class="app-label mb-1.5 block">Adresse de la photo</span>
-            <input
-              v-model="form.presenter.photo_url"
-              type="url"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://"
-              class="app-input"
+            <SiteCareTextField
+              v-model="form.presenterTagline"
+              field-label="Une ligne sur vous, sur la page préparée pour le prospect"
             />
-          </label>
+          </div>
+        </template>
+
+        <div v-else class="grid gap-x-11 gap-y-8 @3xl:grid-cols-2">
+          <div v-for="family in checkedPointFamilies" :key="family.label">
+            <h3 class="border-b border-[var(--app-line)] pb-3 text-base font-semibold text-[var(--app-ink)]">
+              {{ family.label }}
+            </h3>
+            <ul>
+              <li
+                v-for="point in family.points"
+                :key="point.key"
+                class="flex min-h-[54px] items-center justify-between gap-4 border-t border-[var(--app-line)] first:border-t-0"
+              >
+                <label :for="`site-care-point-${point.key}`" class="min-w-0 flex-1 text-[15px] text-[var(--app-ink)]">
+                  {{ point.label }}
+                </label>
+                <UiSwitch :id="`site-care-point-${point.key}`" v-model="point.is_enabled" />
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
-
-      <section class="app-card p-5 @2xl:p-6">
-        <h2 class="text-base font-semibold text-[var(--app-ink)]">Adresse d’envoi</h2>
-        <p class="mt-1 text-sm break-words text-[var(--app-ink-soft)]">
-          {{
-            savedSettings.sender_email === null
-              ? 'L’envoi d’emails n’est pas encore configuré.'
-              : `Les messages partent de ${savedSettings.sender_email}.`
-          }}
-        </p>
-      </section>
-
-      <div
-        class="sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-full border border-[var(--app-line)] bg-[var(--app-surface)]/90 py-1.5 pr-1.5 pl-4 shadow-lg backdrop-blur"
-      >
-        <p
-          class="min-w-0 text-sm"
-          :class="saveFailureMessage ? 'text-[var(--app-red)]' : 'text-[var(--app-ink-soft)]'"
-          role="status"
-        >
-          {{ saveStatusMessage }}
-        </p>
-        <button
-          type="button"
-          class="btn-primary h-11 shrink-0 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
-          :disabled="!canSave"
-          @click="saveSettings"
-        >
-          <UIcon v-if="isSaving" name="i-lucide-loader-circle" class="h-4 w-4 animate-spin" />
-          Enregistrer
-        </button>
-      </div>
     </template>
   </div>
 </template>
 
 <script lang="ts" setup>
 import type { ComputedRef, Ref } from 'vue'
-import type { UiRadioCardOption } from '~/types/UiRadioCardGroup'
-import type {
-  SiteCareCheckedPoint,
-  SiteCarePrice,
-  SiteCareSettings,
-  SiteCareWritingTrigger,
-} from '../../../types/SiteCareSettings'
+import type { UseProfilePhotoReturn, UseToastReturn } from '~/types/Composables'
+import type { SiteCareCheckedPoint, SiteCarePrice, SiteCareSettings } from '../../../types/SiteCareSettings'
 import type {
   SiteCareCheckedPointFamily,
   SiteCareFixedPriceField,
   SiteCareSettingsForm,
+  SiteCareSettingsSection,
+  SiteCareSettingsSectionTab,
+  SiteCareWritingTriggerOption,
 } from '../../../types/SiteCareSettingsPage'
 import { computed, onMounted, ref } from 'vue'
+import { useProfilePhoto } from '~/composables/useProfilePhoto'
+import { useToast } from '~/composables/useToast'
+import { useDrawerStackStore } from '~/stores/drawerStack'
 import { SiteCareService } from '../../../services/siteCareService'
+import { SiteCareBusinessLabels } from '../../../utils/siteCareBusinessLabels'
 
 definePageMeta({ layout: 'dashboard', middleware: ['auth', 'site-care-module'] })
 
 useSeoMeta({ title: 'Entretien de sites · DevLeadHunter' })
 
+const toast: UseToastReturn = useToast()
+const drawerStack: ReturnType<typeof useDrawerStackStore> = useDrawerStackStore()
+const { profilePhotoObjectUrl, ensureProfilePhotoLoaded }: UseProfilePhotoReturn = useProfilePhoto()
+
 const CENTS_PER_EURO: number = 100
 
-const WRITING_TRIGGER_OPTIONS: UiRadioCardOption<SiteCareWritingTrigger>[] = [
+const SECTION_TITLE_ID: string = 'site-care-settings-section-title'
+
+const SETTINGS_SECTION_TABS: Record<SiteCareSettingsSection, SiteCareSettingsSectionTab> = {
+  prices: {
+    key: 'prices',
+    label: 'Prix',
+    title: 'Vos prix',
+    infoAccessibleLabel: 'À propos des prix',
+    infoText:
+      'Le prix de la correction est annoncé dans le message, avant de commencer. Le suivi mensuel n’est proposé qu’ensuite.',
+  },
+  trigger: {
+    key: 'trigger',
+    label: 'Quand écrire',
+    title: 'Quand écrire',
+    infoAccessibleLabel: 'À propos des messages',
+    infoText:
+      'Un site sans rien à corriger reste dans « Rien à signaler » : on ne lui écrit pas. Rien ne part jamais seul : chaque message est relu, puis envoyé par vous.',
+  },
+  points: {
+    key: 'points',
+    label: 'Points regardés',
+    title: 'Ce qui est regardé sur chaque site',
+    infoAccessibleLabel: 'À propos du contrôle',
+    infoText:
+      'Seulement ce que voit un visiteur : la page d’accueil et les réglages publics du nom de domaine. Rien n’est envoyé au site, aucune connexion n’est essayée.',
+  },
+}
+
+const WRITING_TRIGGER_OPTIONS: SiteCareWritingTriggerOption[] = [
   {
     value: 'fix',
     label: 'Dès qu’un point est à corriger',
     description: 'Le réglage conseillé : un message par vrai problème.',
-    icon: 'i-lucide-triangle-alert',
   },
   {
     value: 'watch',
     label: 'Aussi quand trois points sont à surveiller',
     description: 'Plus de messages, pour des corrections plus petites.',
-    icon: 'i-lucide-eye',
   },
 ]
 
@@ -234,10 +273,14 @@ const WRITING_TRIGGER_OPTIONS: UiRadioCardOption<SiteCareWritingTrigger>[] = [
 const savedSettings: Ref<SiteCareSettings | null> = ref(null)
 const form: Ref<SiteCareSettingsForm | null> = ref(null)
 const savedFormSnapshot: Ref<string> = ref('')
+const activeSection: Ref<SiteCareSettingsSection> = ref('prices')
 const isLoadingSettings: Ref<boolean> = ref(true)
 const isSaving: Ref<boolean> = ref(false)
-const hasJustSaved: Ref<boolean> = ref(false)
 const saveFailureMessage: Ref<string | null> = ref(null)
+
+const activeSectionTab: ComputedRef<SiteCareSettingsSectionTab> = computed(
+  (): SiteCareSettingsSectionTab => SETTINGS_SECTION_TABS[activeSection.value],
+)
 
 const quotedPrices: ComputedRef<SiteCarePrice[]> = computed((): SiteCarePrice[] =>
   (savedSettings.value?.prices ?? []).filter((price: SiteCarePrice): boolean => price.price_cents === null),
@@ -274,19 +317,23 @@ const canSave: ComputedRef<boolean> = computed(
   (): boolean => hasUnsavedChanges.value && hasValidPrices.value && !isSaving.value,
 )
 
-const presenterNameExample: ComputedRef<string> = computed(
-  (): string => form.value?.presenter.name.trim() || 'votre nom',
-)
-
-const saveStatusMessage: ComputedRef<string> = computed((): string => {
+const saveProblemMessage: ComputedRef<string | null> = computed((): string | null => {
   if (saveFailureMessage.value !== null) {
     return saveFailureMessage.value
   }
+  return hasUnsavedChanges.value && !hasValidPrices.value ? 'Un prix est un nombre, zéro ou plus.' : null
+})
 
-  if (hasUnsavedChanges.value) {
-    return hasValidPrices.value ? 'Des changements ne sont pas enregistrés.' : 'Un prix est un nombre, zéro ou plus.'
-  }
-  return hasJustSaved.value ? 'Réglages enregistrés.' : ''
+const presenterName: ComputedRef<string> = computed(
+  (): string => savedSettings.value?.presenter.name.trim() || 'votre nom',
+)
+
+const profileLine: ComputedRef<string> = computed((): string => {
+  const sending: string =
+    savedSettings.value?.sender_email === null || savedSettings.value?.sender_email === undefined
+      ? 'L’envoi d’emails n’est pas encore configuré.'
+      : `Les messages partent de ${savedSettings.value.sender_email}.`
+  return `Votre nom, votre site et votre photo viennent de votre profil, commun à tous les modules. ${sending}`
 })
 
 /**
@@ -315,7 +362,8 @@ function buildSettingsForm(settings: SiteCareSettings): SiteCareSettingsForm {
     monthlyPriceEuros: settings.monthly_price_cents / CENTS_PER_EURO,
     trigger: settings.trigger,
     points: settings.points.map((point: SiteCareCheckedPoint): SiteCareCheckedPoint => ({ ...point })),
-    presenter: { ...settings.presenter },
+    presenterRole: settings.presenter.role,
+    presenterTagline: settings.presenter.tagline,
   }
 }
 
@@ -323,7 +371,7 @@ function buildSettingsForm(settings: SiteCareSettings): SiteCareSettingsForm {
  * The settings to send: the form's values back in cents, in the shape the API gave them.
  * @param editedForm - The form as edited.
  * @param currentSettings - The settings the form was built from.
- * @returns The settings to save.
+ * @returns The settings to save; the API keeps the name, the site and the photo of the profile.
  */
 function buildSettingsToSave(editedForm: SiteCareSettingsForm, currentSettings: SiteCareSettings): SiteCareSettings {
   return {
@@ -337,11 +385,9 @@ function buildSettingsToSave(editedForm: SiteCareSettingsForm, currentSettings: 
     trigger: editedForm.trigger,
     points: editedForm.points,
     presenter: {
-      name: editedForm.presenter.name.trim(),
-      role: editedForm.presenter.role.trim(),
-      tagline: editedForm.presenter.tagline.trim(),
-      site_url: editedForm.presenter.site_url.trim(),
-      photo_url: editedForm.presenter.photo_url.trim(),
+      ...currentSettings.presenter,
+      role: editedForm.presenterRole.trim(),
+      tagline: editedForm.presenterTagline.trim(),
     },
     sender_email: currentSettings.sender_email,
   }
@@ -382,11 +428,10 @@ async function saveSettings(): Promise<void> {
     return
   }
   isSaving.value = true
-  hasJustSaved.value = false
   saveFailureMessage.value = null
   try {
     showSettings(await SiteCareService.saveSettings(buildSettingsToSave(form.value, savedSettings.value)))
-    hasJustSaved.value = true
+    toast.success('Réglages enregistrés.')
   } catch (error: unknown) {
     saveFailureMessage.value = SiteCareService.failureMessage(error, 'Les réglages n’ont pas pu être enregistrés.')
   } finally {
@@ -394,7 +439,12 @@ async function saveSettings(): Promise<void> {
   }
 }
 
+/** Open the profile, where the name, the site and the photo of every module are changed. */
+function openProfile(): void {
+  drawerStack.push({ kind: 'profile' })
+}
+
 onMounted(async (): Promise<void> => {
-  await loadSettings()
+  await Promise.all([loadSettings(), ensureProfilePhotoLoaded()])
 })
 </script>

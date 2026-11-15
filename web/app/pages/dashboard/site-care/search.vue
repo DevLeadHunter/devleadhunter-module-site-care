@@ -1,14 +1,7 @@
 <template>
-  <div class="flex min-h-full flex-col">
-    <div class="mb-5">
-      <NuxtLink
-        :to="SITE_CARE_SECTION_PATH"
-        class="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-[var(--app-ink-soft)] transition-colors hover:text-[var(--app-ink)]"
-      >
-        <UIcon name="i-lucide-arrow-left" class="h-3.5 w-3.5" />
-        Mes prospects
-      </NuxtLink>
-      <h1 class="app-page-title mt-1">Nouvelle recherche</h1>
+  <div class="flex min-h-full flex-col gap-7">
+    <div class="flex items-center">
+      <SiteCareBackLink :to="SITE_CARE_SECTION_PATH">Mes prospects</SiteCareBackLink>
     </div>
 
     <UiLoader v-if="isLoadingOptions" label="Chargement de la recherche…" />
@@ -16,348 +9,278 @@
     <UiEmptyState
       v-else-if="searchOptions === null"
       title="Chargement impossible"
-      description="Les métiers et les pays n’ont pas pu être chargés. Vérifiez votre connexion et réessayez."
+      description="Les métiers et les départements n’ont pas pu être chargés. Vérifiez votre connexion et réessayez."
     >
       <template #action>
-        <button type="button" class="btn-secondary" @click="loadSearchOptions">
+        <button type="button" class="app-btn-secondary" @click="loadSearchOptions">
           <UIcon name="i-lucide-refresh-cw" class="h-4 w-4" />
           Réessayer
         </button>
       </template>
     </UiEmptyState>
 
-    <template v-else>
-      <UiWizardStepper :model-value="currentStep" :steps="SEARCH_STEPS" class="mb-6" @update:model-value="goToStep" />
+    <div v-else class="flex flex-wrap items-start gap-7">
+      <div class="flex min-w-0 flex-[999_1_30rem] flex-col gap-5">
+        <SiteCarePageHeader
+          title="Nouvelle recherche"
+          description="Fait entrer dans le module des entreprises qui ont déjà un site."
+        />
 
-      <div class="flex min-w-0 flex-1 flex-col">
-        <div v-if="currentStep === 1" class="wizard-step space-y-5 pb-20">
-          <div class="app-card space-y-3 p-5 @2xl:p-6">
-            <h2 id="site-care-search-source-title" class="text-base font-semibold text-[var(--app-ink)]">
-              Où chercher
-            </h2>
-            <UiRadioCardGroup
-              v-model="selectedSource"
-              :options="sourceOptions"
-              labelled-by="site-care-search-source-title"
-              class="@2xl:grid-cols-2"
-            />
-          </div>
-
-          <div class="app-card space-y-5 p-5 @2xl:p-6">
-            <template v-if="isSearchingOpenMap">
-              <div>
-                <h2 class="text-base font-semibold text-[var(--app-ink)]">Types d’entreprises</h2>
-                <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-                  Cochez les types qui vous intéressent. Sans rien cocher, la recherche prend toutes les entreprises.
-                  Les enseignes et les réseaux sont laissés de côté.
-                </p>
-              </div>
-
-              <UiChipToggleGroup v-model="selectedFamilyKeys" :options="familyOptions" label="Types d’entreprises" />
-            </template>
-
-            <template v-else>
-              <div>
-                <h2 id="site-care-search-trades-title" class="text-base font-semibold text-[var(--app-ink)]">
-                  Métiers recherchés
-                </h2>
-                <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-                  Cochez autant de métiers que vous voulez. Sans métier coché, la recherche prend toutes les entreprises
-                  de la zone.
-                </p>
-              </div>
-
-              <div class="flex flex-wrap gap-2" role="group" aria-labelledby="site-care-search-trades-title">
-                <button
-                  v-for="trade in tradeChoices"
-                  :key="trade.key"
-                  type="button"
-                  :class="choiceChipClass(trade.isSelected)"
-                  :aria-pressed="trade.isSelected"
-                  :disabled="trade.availableCount === 0"
-                  @click="toggleTrade(trade.key)"
-                >
-                  {{ trade.label }}
-                  <span class="font-[family-name:var(--app-font-mono)] text-xs opacity-70">
-                    {{ trade.availableCount }}
+        <template v-if="launchedSearch === null">
+          <SiteCareCard v-if="currentStep === 'source'" title="Où chercher" title-id="site-care-search-source-title">
+            <div class="flex flex-col" role="radiogroup" aria-labelledby="site-care-search-source-title">
+              <SiteCareChoiceRow
+                v-for="source in searchOptions.sources"
+                :key="source.key"
+                :title="source.label"
+                :description="source.hint"
+                :is-selected="source.key === selectedSource"
+                @click="selectedSource = source.key"
+              >
+                <template #leading>
+                  <span
+                    class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                    :class="SEARCH_SOURCE_TILE_CLASSES[source.key]"
+                    aria-hidden="true"
+                  >
+                    <UIcon :name="SEARCH_SOURCE_ICONS[source.key]" class="h-[18px] w-[18px]" />
                   </span>
-                </button>
-              </div>
+                </template>
+              </SiteCareChoiceRow>
+            </div>
+          </SiteCareCard>
 
-              <div class="space-y-1.5 text-[13px] leading-relaxed text-[var(--app-ink-soft)]">
-                <p v-if="selectedCountry">
-                  Le nombre à côté de chaque métier compte les entreprises disponibles. Pays choisi :
-                  {{ selectedCountry.label }}.
-                </p>
-                <p>
-                  Un métier manque ? Lancez une recherche du module Sites web sur ce métier : les entreprises qui ont
-                  déjà un site arrivent ici.
-                </p>
-              </div>
-            </template>
-
-            <div class="border-t border-[var(--app-line-soft)] pt-5">
-              <label for="site-care-search-count" class="app-label mb-1.5 block">Nombre de prospects</label>
-              <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <input
-                  id="site-care-search-count"
-                  v-model.number="wantedProspectCount"
-                  type="number"
-                  inputmode="numeric"
-                  min="1"
-                  :max="maximumWantedProspectCount"
-                  step="1"
-                  class="app-input w-28"
+          <template v-else-if="currentStep === 'zone' && isSearchingOpenMap">
+            <SiteCareCard title="Les départements">
+              <template #info>
+                <SiteCareInfoTip
+                  accessible-label="À propos des départements"
+                  info-text="La recherche lit tous les sites d’un département avant de passer au suivant. Les départements d’outre-mer ne sont pas proposés."
                 />
-                <p class="text-sm text-[var(--app-ink-soft)]">{{ wantedProspectCountHint }}</p>
+              </template>
+              <SiteCareDepartmentPicker
+                v-model="selectedDepartmentCodes"
+                :departments="searchOptions.open_map.departments"
+                :maximum-count="searchOptions.open_map.max_departments"
+              />
+            </SiteCareCard>
+
+            <SiteCareCard title="Les types d’entreprises">
+              <template #info>
+                <SiteCareInfoTip
+                  accessible-label="À propos des types d’entreprises"
+                  info-text="Sans rien cocher, la recherche prend toutes les entreprises. Les enseignes, les réseaux, les organismes publics et les associations sont laissés de côté."
+                />
+              </template>
+              <div class="flex flex-wrap gap-2" role="group" aria-label="Types d’entreprises">
+                <SiteCareChoiceChip
+                  v-for="family in searchOptions.open_map.families"
+                  :key="family.key"
+                  :is-selected="selectedFamilyKeys.includes(family.key)"
+                  @click="toggleFamily(family.key)"
+                >
+                  {{ family.label }}
+                </SiteCareChoiceChip>
               </div>
-            </div>
-          </div>
-        </div>
+            </SiteCareCard>
+          </template>
 
-        <div v-else-if="currentStep === ZONE_STEP_ID" class="wizard-step space-y-5 pb-20">
-          <div v-if="isSearchingOpenMap" class="app-card space-y-4 p-5 @2xl:p-6">
-            <div>
-              <h2 class="text-base font-semibold text-[var(--app-ink)]">Départements</h2>
-              <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-                {{ searchOptions.open_map.max_departments }} départements au plus. La recherche lit les sites d’un
-                département avant de passer au suivant.
-              </p>
-            </div>
-            <SiteCareDepartmentPicker
-              v-model="selectedDepartmentCodes"
-              :departments="searchOptions.open_map.departments"
-              :maximum-count="searchOptions.open_map.max_departments"
-            />
-          </div>
-
-          <div v-else class="app-card space-y-5 p-5 @2xl:p-6">
-            <div>
-              <h2 id="site-care-search-country-title" class="text-base font-semibold text-[var(--app-ink)]">Pays</h2>
-              <div class="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-labelledby="site-care-search-country-title">
-                <button
+          <template v-else-if="currentStep === 'zone'">
+            <SiteCareCard v-if="searchOptions.countries.length > 1" title="Le pays">
+              <div class="flex flex-wrap gap-2" role="group" aria-label="Pays">
+                <SiteCareChoiceChip
                   v-for="country in searchOptions.countries"
                   :key="country.code"
-                  type="button"
-                  role="radio"
-                  :aria-checked="country.code === selectedCountryCode"
-                  :class="choiceChipClass(country.code === selectedCountryCode)"
+                  :is-selected="country.code === selectedCountryCode"
                   @click="selectCountry(country.code)"
                 >
                   {{ country.label }}
-                  <span class="font-[family-name:var(--app-font-mono)] text-xs opacity-70">
-                    {{ country.available_count }}
-                  </span>
-                </button>
+                  <span class="text-sm opacity-70">{{ country.available_count }}</span>
+                </SiteCareChoiceChip>
               </div>
-            </div>
+            </SiteCareCard>
 
-            <div class="border-t border-[var(--app-line-soft)] pt-5">
-              <label for="site-care-search-city" class="text-base font-semibold text-[var(--app-ink)]">
-                Villes
-                <span class="text-sm font-normal text-[var(--app-ink-soft)]">(facultatif)</span>
-              </label>
-              <p class="mt-1 text-sm text-[var(--app-ink-soft)]">
-                Laissez vide : l’app choisit les villes et en change jusqu’au compte.
-              </p>
-              <ul v-if="cities.length > 0" class="mt-3 flex flex-wrap gap-2">
-                <li v-for="city in cities" :key="city">
-                  <button
-                    type="button"
-                    :class="choiceChipClass(true)"
-                    :aria-label="`Retirer ${city}`"
-                    @click="removeCity(city)"
-                  >
-                    {{ city }}
-                    <UIcon name="i-lucide-x" class="h-3.5 w-3.5" />
-                  </button>
-                </li>
-              </ul>
-              <form class="mt-3 flex gap-2 @2xl:max-w-md" @submit.prevent="addTypedCity">
+            <SiteCareCard title="Les métiers">
+              <template #info>
+                <SiteCareInfoTip
+                  accessible-label="À propos des métiers"
+                  info-text="Sans métier coché, la recherche prend toutes les entreprises du pays. Le nombre compte les entreprises disponibles. Un métier manque ? Lancez une recherche du module Sites web sur ce métier : les entreprises qui ont déjà un site arrivent ici."
+                />
+              </template>
+              <div class="flex flex-wrap gap-2" role="group" aria-label="Métiers">
+                <SiteCareChoiceChip
+                  v-for="trade in tradeChoices"
+                  :key="trade.key"
+                  :is-selected="trade.isSelected"
+                  :is-disabled="trade.availableCount === 0"
+                  @click="toggleTrade(trade.key)"
+                >
+                  {{ trade.label }}
+                  <span class="text-sm opacity-70">{{ trade.availableCount }}</span>
+                </SiteCareChoiceChip>
+              </div>
+            </SiteCareCard>
+
+            <SiteCareCard title="Les villes">
+              <template #info>
+                <SiteCareInfoTip
+                  accessible-label="À propos des villes"
+                  info-text="Facultatif. Sans ville, l’app choisit les villes du pays et en change jusqu’à atteindre le nombre demandé."
+                />
+              </template>
+              <div v-if="cities.length > 0" class="flex flex-wrap gap-2" role="group" aria-label="Villes choisies">
+                <SiteCareChoiceChip
+                  v-for="city in cities"
+                  :key="city"
+                  is-selected
+                  :aria-label="`Retirer ${city}`"
+                  @click="removeCity(city)"
+                >
+                  {{ city }}
+                </SiteCareChoiceChip>
+              </div>
+              <form class="flex max-w-md flex-wrap gap-2" @submit.prevent="addTypedCity">
                 <input
-                  id="site-care-search-city"
                   v-model="cityInput"
                   type="text"
                   autocomplete="off"
                   placeholder="Ajouter une ville"
-                  class="app-input min-w-0 flex-1"
+                  aria-label="Ville à ajouter"
+                  class="app-input h-12 min-w-0 flex-[999_1_12rem] rounded-full px-4 text-[15px]"
                 />
-                <button
-                  type="submit"
-                  class="btn-secondary shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="cityInput.trim() === ''"
-                >
+                <SiteCareButton type="submit" class="flex-[1_1_auto]" :is-disabled="cityInput.trim() === ''">
                   Ajouter
-                </button>
+                </SiteCareButton>
               </form>
-            </div>
-          </div>
-        </div>
+            </SiteCareCard>
+          </template>
 
-        <div v-else-if="currentStep === 3" class="wizard-step space-y-5 pb-20">
-          <div v-if="isSearchingOpenMap" class="app-card space-y-3 p-5 @2xl:p-6">
-            <h2 id="site-care-search-keep-title" class="text-base font-semibold text-[var(--app-ink)]">
-              Sites à garder
-            </h2>
-            <UiRadioCardGroup
-              v-model="selectedKeepRule"
-              :options="keepRuleOptions"
-              labelled-by="site-care-search-keep-title"
-              class="@3xl:grid-cols-3"
-            />
-            <p class="text-[13px] leading-relaxed text-[var(--app-ink-soft)]">
-              Un site lu n’est jamais relu par une recherche suivante, qu’il ait été gardé ou non.
-            </p>
-          </div>
-
-          <div class="app-card space-y-5 p-5 @2xl:p-6">
-            <div>
-              <h2 id="site-care-search-channel-title" class="text-base font-semibold text-[var(--app-ink)]">
-                Comment les joindre
-              </h2>
-              <ul class="mt-3 grid gap-2" aria-labelledby="site-care-search-channel-title">
-                <li
-                  v-for="channel in CONTACT_CHANNEL_CHOICES"
-                  :key="channel.key"
-                  class="flex items-start gap-3 rounded-xl border px-3.5 py-3"
-                  :class="
-                    channel.isSelected
-                      ? 'border-[var(--app-ink)] bg-[var(--app-surface-2)]'
-                      : 'border-[var(--app-line)] opacity-70'
-                  "
-                  :aria-current="channel.isSelected ? 'true' : undefined"
-                >
-                  <UIcon :name="channel.icon" class="mt-0.5 h-4 w-4 shrink-0 text-[var(--app-ink)]" />
-                  <span class="min-w-0 flex-1">
-                    <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--app-ink)]">
-                      {{ channel.label }}
-                      <span v-if="!channel.isAvailable" class="app-badge">Bientôt</span>
-                    </span>
-                    <span class="mt-0.5 block text-xs leading-relaxed text-[var(--app-ink-soft)]">
-                      {{ channel.description }}
-                    </span>
-                  </span>
-                  <span
-                    class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
-                    :class="
-                      channel.isSelected ? 'border-[var(--app-ink)] bg-[var(--app-ink)]' : 'border-[var(--app-faint)]'
-                    "
-                  >
-                    <UIcon v-if="channel.isSelected" name="i-lucide-check" class="h-3 w-3 text-[var(--app-bg)]" />
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            <div class="border-t border-[var(--app-line-soft)] pt-5">
-              <p class="app-label mb-2">Site web</p>
-              <p class="text-sm leading-relaxed text-[var(--app-ink-soft)]">
-                Ce module garde les entreprises qui ont un site en ligne. Le site de chacune est regardé pendant la
-                recherche.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="wizard-step space-y-5 pb-20">
-          <div class="app-card space-y-5 p-5 @2xl:p-6">
-            <h2 class="text-base font-semibold text-[var(--app-ink)]">Objectif</h2>
-            <dl class="divide-y divide-[var(--app-line-soft)]">
-              <div
-                v-for="row in recapRows"
-                :key="row.label"
-                class="flex flex-col gap-0.5 py-2.5 first:pt-0 @2xl:flex-row @2xl:items-baseline @2xl:justify-between @2xl:gap-6"
-              >
-                <dt class="app-label @2xl:shrink-0">{{ row.label }}</dt>
-                <dd class="min-w-0 text-sm font-medium break-words text-[var(--app-ink)] @2xl:text-right">
-                  {{ row.value }}
-                </dd>
+          <template v-else>
+            <SiteCareCard v-if="isSearchingOpenMap" title="Les sites à garder" title-id="site-care-search-keep-title">
+              <template #info>
+                <SiteCareInfoTip
+                  accessible-label="À propos des sites gardés"
+                  info-text="Chaque site de la zone est lu. Un site lu n’est jamais relu par une recherche suivante, qu’il ait été gardé ou non."
+                />
+              </template>
+              <div class="flex flex-col" role="radiogroup" aria-labelledby="site-care-search-keep-title">
+                <SiteCareChoiceRow
+                  v-for="keepRule in searchOptions.open_map.keep_rules"
+                  :key="keepRule.key"
+                  :title="keepRule.label"
+                  :description="keepRule.hint"
+                  :is-selected="keepRule.key === selectedKeepRule"
+                  @click="selectedKeepRule = keepRule.key"
+                />
               </div>
-            </dl>
-            <p class="text-sm text-[var(--app-ink-soft)]">Les entreprises déjà connues ne sont jamais reprises.</p>
-            <template v-if="isSearchingOpenMap">
-              <p class="text-sm text-[var(--app-ink-soft)]">
-                La recherche lit chaque site de la zone : comptez de 20 à 40 minutes par département. Elle tourne toute
-                seule et s’arrête depuis « Mes prospects ».
-              </p>
-              <p class="text-xs text-[var(--app-faint)]">{{ searchOptions.open_map.credit }}</p>
-            </template>
-            <p v-if="launchBlockerMessage" class="text-sm text-[var(--app-red)]">{{ launchBlockerMessage }}</p>
-            <p v-if="launchFailureMessage" class="text-sm leading-relaxed text-[var(--app-red)]" role="alert">
-              {{ launchFailureMessage }}
+            </SiteCareCard>
+
+            <SiteCareCard title="Combien de prospects, au plus" title-id="site-care-search-count-title">
+              <div
+                class="inline-flex flex-wrap gap-1 self-start rounded-[14px] bg-[var(--app-surface-2)] p-1"
+                role="radiogroup"
+                aria-labelledby="site-care-search-count-title"
+              >
+                <button
+                  v-for="countChoice in countChoices"
+                  :key="countChoice"
+                  type="button"
+                  role="radio"
+                  :aria-checked="countChoice === wantedProspectCount"
+                  class="min-h-11 cursor-pointer rounded-[10px] px-5 text-[15px] transition-colors"
+                  :class="
+                    countChoice === wantedProspectCount
+                      ? 'bg-[var(--app-btn-bg)] font-semibold text-[var(--app-btn-text)]'
+                      : 'font-medium text-[var(--app-ink-soft)] hover:text-[var(--app-ink)]'
+                  "
+                  @click="wantedProspectCount = countChoice"
+                >
+                  {{ countChoice.toLocaleString('fr-FR') }}
+                </button>
+              </div>
+              <p class="text-sm text-[var(--app-ink-soft)]">{{ countHint }}</p>
+            </SiteCareCard>
+
+            <p v-if="isSearchingOpenMap" class="text-sm text-[var(--app-ink-soft)]">
+              {{ searchOptions.open_map.credit }}
             </p>
-            <div
-              v-if="launchedSearch"
-              class="flex items-start gap-3 rounded-xl bg-[var(--app-green-soft)] p-4 text-sm leading-relaxed text-[var(--app-green)]"
-              role="status"
-            >
-              <UIcon name="i-lucide-check" class="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                Recherche lancée. Vous pouvez changer de page pendant qu’elle tourne : les prospects arrivent dans « Mes
-                prospects » au fur et à mesure.
-              </span>
-            </div>
-          </div>
-        </div>
+          </template>
+        </template>
 
-        <div
-          class="sticky bottom-0 z-10 mt-auto flex items-center gap-2 rounded-full border border-[var(--app-line)] bg-[var(--app-surface)]/90 p-1.5 shadow-lg backdrop-blur sm:justify-between sm:gap-3 sm:px-3 sm:py-2"
-        >
-          <button
-            v-if="currentStep > 1 && launchedSearch === null"
-            type="button"
-            class="btn-secondary h-11 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
-            :disabled="isLaunching"
-            @click="goToStep(currentStep - 1)"
-          >
-            <UIcon name="i-lucide-arrow-left" class="h-3.5 w-3.5" />
-            Précédent
-          </button>
-          <span v-else class="hidden sm:block" />
-
-          <button
-            v-if="currentStep < SEARCH_STEPS.length"
-            type="button"
-            class="btn-primary h-11 flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:flex-none"
-            :disabled="!canContinue"
-            @click="goToStep(currentStep + 1)"
-          >
-            Suivant
-            <UIcon name="i-lucide-arrow-right" class="h-3.5 w-3.5" />
-          </button>
-          <NuxtLink
-            v-else-if="launchedSearch"
-            :to="SITE_CARE_SECTION_PATH"
-            class="btn-primary h-11 flex-1 sm:h-9 sm:flex-none"
-          >
-            Voir mes prospects
-          </NuxtLink>
-          <button
-            v-else
-            type="button"
-            class="btn-primary h-11 flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:flex-none"
-            :disabled="!canLaunch"
-            @click="launchSearch"
-          >
-            <UIcon
-              :name="isLaunching ? 'i-lucide-loader-circle' : 'i-lucide-search'"
-              class="h-3.5 w-3.5"
-              :class="{ 'animate-spin': isLaunching }"
-            />
-            Lancer la recherche
-          </button>
-        </div>
+        <SiteCareOutcomeCard v-else title="Recherche lancée" :description="launchedLine" />
       </div>
-    </template>
+
+      <SiteCareStepActionCard
+        class="flex-[1_1_22rem] @4xl:max-w-[26rem]"
+        :title="stepTitle"
+        :step-count="SEARCH_STEPS.length"
+        :reached-step-count="reachedStepCount"
+      >
+        <dl class="flex flex-col">
+          <div
+            v-for="recapRow in recapRows"
+            :key="recapRow.label"
+            class="flex items-baseline justify-between gap-4 border-t border-[var(--app-line)] py-3 first:border-t-0 first:pt-0"
+          >
+            <dt class="shrink-0 text-[13px] font-medium text-[var(--app-ink-soft)]">{{ recapRow.label }}</dt>
+            <dd class="min-w-0 text-right text-[15px] font-semibold break-words text-[var(--app-ink)]">
+              {{ recapRow.value }}
+            </dd>
+          </div>
+        </dl>
+
+        <p v-if="blockerMessage" class="text-sm text-[var(--app-ink-soft)]">{{ blockerMessage }}</p>
+        <p v-if="launchFailureMessage" class="text-sm leading-relaxed text-[var(--app-red)]" role="alert">
+          {{ launchFailureMessage }}
+        </p>
+
+        <div class="flex flex-col gap-2.5">
+          <template v-if="launchedSearch === null">
+            <SiteCareButton
+              v-if="currentStep !== 'keep'"
+              size="large"
+              class="w-full"
+              trailing-icon="i-lucide-arrow-right"
+              :is-disabled="!canContinue"
+              @click="goToNextStep"
+            >
+              Continuer
+            </SiteCareButton>
+            <SiteCareButton
+              v-else
+              size="large"
+              class="w-full"
+              leading-icon="i-lucide-search"
+              :is-disabled="!canLaunch"
+              :is-loading="isLaunching"
+              @click="launchSearch"
+            >
+              Lancer la recherche
+            </SiteCareButton>
+            <SiteCareButton
+              v-if="currentStep !== 'source'"
+              variant="secondary"
+              size="large"
+              class="w-full"
+              leading-icon="i-lucide-arrow-left"
+              :is-disabled="isLaunching"
+              @click="goToPreviousStep"
+            >
+              Revenir
+            </SiteCareButton>
+          </template>
+          <SiteCareButton v-else :to="SITE_CARE_SECTION_PATH" size="large" class="w-full">
+            Voir mes prospects
+          </SiteCareButton>
+        </div>
+      </SiteCareStepActionCard>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import type { ComputedRef, Ref } from 'vue'
 import type { UseDashboardScrollReturn } from '~/types/Composables'
-import type { SelectFieldOption } from '~/types/SelectField'
-import type { UiRadioCardOption } from '~/types/UiRadioCardGroup'
-import type { UiWizardStep } from '~/types/UiWizardStepper'
 import type {
   SiteCareSearch,
   SiteCareSearchCountryOption,
@@ -369,8 +292,8 @@ import type {
   SiteCareSearchTradeOption,
 } from '../../../types/SiteCareSearch'
 import type {
-  SiteCareContactChannelChoice,
   SiteCareSearchRecapRow,
+  SiteCareSearchStep,
   SiteCareSearchTradeChoice,
 } from '../../../types/SiteCareSearchPage'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -384,52 +307,41 @@ useSeoMeta({ title: 'Nouvelle recherche · DevLeadHunter' })
 
 const { scrollToTop }: UseDashboardScrollReturn = useDashboardScroll()
 
-const ZONE_STEP_ID: number = 2
+const SEARCH_STEPS: SiteCareSearchStep[] = ['source', 'zone', 'keep']
 
-const SEARCH_STEPS: UiWizardStep[] = [
-  { id: 1, label: 'Cible' },
-  { id: ZONE_STEP_ID, label: 'Zone' },
-  { id: 3, label: 'Critères' },
-  { id: 4, label: 'Lancer' },
-]
+const SEARCH_STEP_NAMES: Record<SiteCareSearchStep, string> = {
+  source: 'où chercher',
+  zone: 'la zone',
+  keep: 'les sites à garder',
+}
+
+const OWN_BASE_KEEP_STEP_NAME: string = 'le nombre'
 
 const DEFAULT_WANTED_PROSPECT_COUNT: number = 50
 const DEFAULT_OPEN_MAP_WANTED_PROSPECT_COUNT: number = 300
+
+const OWN_BASE_COUNT_CHOICES: number[] = [25, 50, 100, 300]
+const OPEN_MAP_COUNT_CHOICES: number[] = [100, 300, 1000, 2000]
 
 const SEARCH_SOURCE_ICONS: Record<SiteCareSearchSource, string> = {
   base: 'i-lucide-database',
   open_map: 'i-lucide-map',
 }
 
-const KEEP_RULE_ICONS: Record<SiteCareSearchKeepRule, string> = {
-  security: 'i-lucide-shield-alert',
-  issues: 'i-lucide-triangle-alert',
-  all: 'i-lucide-list',
+const SEARCH_SOURCE_TILE_CLASSES: Record<SiteCareSearchSource, string> = {
+  base: 'bg-[var(--app-blue-soft)] text-[var(--app-blue)]',
+  open_map: 'bg-[var(--app-green-soft)] text-[var(--app-green)]',
 }
 
-const CONTACT_CHANNEL_CHOICES: SiteCareContactChannelChoice[] = [
-  {
-    key: 'email',
-    label: 'Par email',
-    description:
-      'Seules les entreprises dont on trouve l’adresse e-mail deviennent des prospects. Les autres sont gardées à part, dans « Sans email ».',
-    icon: 'i-lucide-mail',
-    isSelected: true,
-    isAvailable: true,
-  },
-  {
-    key: 'email-or-sms',
-    label: 'Par email, sinon par SMS',
-    description: 'Sans adresse e-mail, un numéro de portable suffit.',
-    icon: 'i-lucide-message-square-text',
-    isSelected: false,
-    isAvailable: false,
-  },
-]
+const KEEP_RULE_SHORT_LABELS: Record<SiteCareSearchKeepRule, string> = {
+  security: 'Avec un souci de sécurité',
+  issues: 'Avec un souci',
+  all: 'Tous',
+}
 
 const searchOptions: Ref<SiteCareSearchOptions | null> = ref(null)
 const isLoadingOptions: Ref<boolean> = ref(true)
-const currentStep: Ref<number> = ref(1)
+const currentStep: Ref<SiteCareSearchStep> = ref('source')
 const selectedSource: Ref<SiteCareSearchSource> = ref('base')
 const selectedTradeKeys: Ref<string[]> = ref([])
 const selectedCountryCode: Ref<string | null> = ref(null)
@@ -445,42 +357,18 @@ const launchFailureMessage: Ref<string | null> = ref(null)
 
 const isSearchingOpenMap: ComputedRef<boolean> = computed((): boolean => selectedSource.value === 'open_map')
 
-const sourceOptions: ComputedRef<UiRadioCardOption<SiteCareSearchSource>[]> = computed(
-  (): UiRadioCardOption<SiteCareSearchSource>[] =>
-    (searchOptions.value?.sources ?? []).map(
-      (source: SiteCareSearchLabelledChoice<SiteCareSearchSource>): UiRadioCardOption<SiteCareSearchSource> => ({
-        value: source.key,
-        label: source.label,
-        description: source.hint ?? '',
-        icon: SEARCH_SOURCE_ICONS[source.key],
-      }),
-    ),
-)
-
-const familyOptions: ComputedRef<SelectFieldOption[]> = computed((): SelectFieldOption[] =>
-  (searchOptions.value?.open_map.families ?? []).map(
-    (family: SiteCareSearchLabelledChoice): SelectFieldOption => ({ value: family.key, label: family.label }),
-  ),
-)
-
-const keepRuleOptions: ComputedRef<UiRadioCardOption<SiteCareSearchKeepRule>[]> = computed(
-  (): UiRadioCardOption<SiteCareSearchKeepRule>[] =>
-    (searchOptions.value?.open_map.keep_rules ?? []).map(
-      (keepRule: SiteCareSearchLabelledChoice<SiteCareSearchKeepRule>): UiRadioCardOption<SiteCareSearchKeepRule> => ({
-        value: keepRule.key,
-        label: keepRule.label,
-        description: keepRule.hint ?? '',
-        icon: KEEP_RULE_ICONS[keepRule.key],
-      }),
-    ),
-)
-
 const maximumWantedProspectCount: ComputedRef<number> = computed((): number => {
   if (searchOptions.value === null) {
     return DEFAULT_WANTED_PROSPECT_COUNT
   }
   return isSearchingOpenMap.value ? searchOptions.value.open_map.max_count : searchOptions.value.max_count
 })
+
+const countChoices: ComputedRef<number[]> = computed((): number[] =>
+  (isSearchingOpenMap.value ? OPEN_MAP_COUNT_CHOICES : OWN_BASE_COUNT_CHOICES).filter(
+    (countChoice: number): boolean => countChoice <= maximumWantedProspectCount.value,
+  ),
+)
 
 const selectedCountry: ComputedRef<SiteCareSearchCountryOption | null> = computed(
   (): SiteCareSearchCountryOption | null =>
@@ -504,22 +392,6 @@ const selectedTradeChoices: ComputedRef<SiteCareSearchTradeChoice[]> = computed(
   tradeChoices.value.filter((trade: SiteCareSearchTradeChoice): boolean => trade.isSelected),
 )
 
-const hasValidWantedProspectCount: ComputedRef<boolean> = computed(
-  (): boolean =>
-    Number.isInteger(wantedProspectCount.value) &&
-    wantedProspectCount.value >= 1 &&
-    wantedProspectCount.value <= maximumWantedProspectCount.value,
-)
-
-const wantedProspectCountHint: ComputedRef<string> = computed((): string => {
-  if (isSearchingOpenMap.value) {
-    return `au plus (${maximumWantedProspectCount.value} au maximum) : la recherche s’arrête à ce nombre, ou quand toute la zone est lue`
-  }
-  return selectedTradeChoices.value.length > 1
-    ? `en tout, répartis entre les ${selectedTradeChoices.value.length} métiers`
-    : 'en tout'
-})
-
 /** Businesses available for the country and trades chosen; the cities typed are not counted here. */
 const availableBusinessCount: ComputedRef<number> = computed((): number => {
   if (selectedCountry.value === null) {
@@ -535,98 +407,109 @@ const availableBusinessCount: ComputedRef<number> = computed((): number => {
   )
 })
 
-const launchBlockerMessage: ComputedRef<string | null> = computed((): string | null => {
+/** Why the search cannot go on from the zone, once the zone is shown. */
+const blockerMessage: ComputedRef<string | null> = computed((): string | null => {
+  if (currentStep.value === 'source' || launchedSearch.value !== null) {
+    return null
+  }
+
   if (isSearchingOpenMap.value) {
-    return selectedDepartmentCodes.value.length === 0 ? 'Choisissez au moins un département, à l’étape Zone.' : null
+    return selectedDepartmentCodes.value.length === 0 ? 'Choisissez au moins un département.' : null
+  }
+  if (selectedCountry.value === null) {
+    return 'Aucun pays n’a d’entreprise disponible.'
   }
   return cities.value.length === 0 && availableBusinessCount.value === 0
     ? 'Aucune entreprise disponible pour ces critères.'
     : null
 })
 
-const selectedSourceLabel: ComputedRef<string> = computed(
-  (): string =>
-    sourceOptions.value.find(
-      (source: UiRadioCardOption<SiteCareSearchSource>): boolean => source.value === selectedSource.value,
-    )?.label ?? '',
+const canContinue: ComputedRef<boolean> = computed(
+  (): boolean => currentStep.value === 'source' || blockerMessage.value === null,
 )
 
-const openMapRecapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] => {
-  const selectedFamilyLabels: string[] = labelsOfSelectedChoices(
-    searchOptions.value?.open_map.families ?? [],
-    selectedFamilyKeys.value,
-  )
-  const selectedDepartmentLabels: string[] = labelsOfSelectedChoices(
-    searchOptions.value?.open_map.departments ?? [],
-    selectedDepartmentCodes.value,
-  )
-  return [
-    { label: 'Source', value: selectedSourceLabel.value },
-    {
-      label: 'Entreprises',
-      value: selectedFamilyLabels.length === 0 ? 'Toutes les entreprises' : selectedFamilyLabels.join(', '),
-    },
-    { label: 'Zone', value: selectedDepartmentLabels.join(', ') || 'Aucun département choisi' },
-    {
-      label: 'Sites gardés',
-      value:
-        keepRuleOptions.value.find(
-          (keepRule: UiRadioCardOption<SiteCareSearchKeepRule>): boolean => keepRule.value === selectedKeepRule.value,
-        )?.label ?? '',
-    },
-    { label: 'Nombre', value: `${countedLabel(wantedProspectCount.value, 'prospect', 'prospects')} au plus` },
-    { label: 'Joindre', value: 'Par email' },
-  ]
-})
-
-const ownBaseRecapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] => {
-  const countryLabel: string = selectedCountry.value?.label ?? ''
-  const hasTypedCities: boolean = cities.value.length > 0
-  return [
-    { label: 'Source', value: selectedSourceLabel.value },
-    {
-      label: 'Métiers',
-      value:
-        selectedTradeChoices.value.length === 0
-          ? 'Tous les métiers'
-          : selectedTradeChoices.value.map((trade: SiteCareSearchTradeChoice): string => trade.label).join(', '),
-    },
-    { label: 'Nombre', value: countedLabel(wantedProspectCount.value, 'prospect', 'prospects') },
-    {
-      label: 'Zone',
-      value: hasTypedCities
-        ? `${countryLabel} : ${cities.value.join(', ')}`
-        : `${countryLabel}, villes choisies par l’app`,
-    },
-    { label: 'Joindre', value: 'Par email' },
-    {
-      label: 'Disponibles',
-      value: hasTypedCities
-        ? 'Le compte est vérifié au lancement'
-        : countedLabel(availableBusinessCount.value, 'entreprise', 'entreprises'),
-    },
-  ]
-})
-
-const recapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] =>
-  isSearchingOpenMap.value ? openMapRecapRows.value : ownBaseRecapRows.value,
+const hasValidWantedProspectCount: ComputedRef<boolean> = computed(
+  (): boolean =>
+    Number.isInteger(wantedProspectCount.value) &&
+    wantedProspectCount.value >= 1 &&
+    wantedProspectCount.value <= maximumWantedProspectCount.value,
 )
-
-const canContinue: ComputedRef<boolean> = computed((): boolean => {
-  if (!hasValidWantedProspectCount.value) {
-    return false
-  }
-
-  if (isSearchingOpenMap.value) {
-    return currentStep.value !== ZONE_STEP_ID || selectedDepartmentCodes.value.length > 0
-  }
-  return selectedCountry.value !== null
-})
 
 const canLaunch: ComputedRef<boolean> = computed(
   (): boolean =>
-    canContinue.value && launchBlockerMessage.value === null && !isLaunching.value && launchedSearch.value === null,
+    currentStep.value === 'keep' &&
+    blockerMessage.value === null &&
+    hasValidWantedProspectCount.value &&
+    !isLaunching.value &&
+    launchedSearch.value === null,
 )
+
+const reachedStepCount: ComputedRef<number> = computed((): number =>
+  launchedSearch.value !== null ? SEARCH_STEPS.length : SEARCH_STEPS.indexOf(currentStep.value) + 1,
+)
+
+const stepTitle: ComputedRef<string> = computed((): string => {
+  if (launchedSearch.value !== null) {
+    return 'Recherche lancée'
+  }
+  const stepName: string =
+    currentStep.value === 'keep' && !isSearchingOpenMap.value
+      ? OWN_BASE_KEEP_STEP_NAME
+      : SEARCH_STEP_NAMES[currentStep.value]
+  return `Étape ${reachedStepCount.value} sur ${SEARCH_STEPS.length} : ${stepName}`
+})
+
+const countHint: ComputedRef<string> = computed((): string => {
+  if (isSearchingOpenMap.value) {
+    return 'La recherche s’arrête à ce nombre de sites gardés, ou quand toute la zone est lue.'
+  }
+  if (cities.value.length > 0) {
+    return 'Le nombre d’entreprises disponibles dans ces villes est vérifié au lancement.'
+  }
+  return `${availableBusinessCount.value} ${availableBusinessCount.value > 1 ? 'entreprises disponibles' : 'entreprise disponible'} pour ces critères. Les entreprises déjà connues ne sont jamais reprises.`
+})
+
+const launchedLine: ComputedRef<string> = computed((): string =>
+  isSearchingOpenMap.value
+    ? 'Elle tourne toute seule : comptez 20 à 40 minutes par département. Les prospects arrivent dans « Mes prospects » au fur et à mesure, et la recherche s’arrête depuis cette page.'
+    : 'Elle tourne toute seule. Les prospects arrivent dans « Mes prospects » au fur et à mesure.',
+)
+
+const recapRows: ComputedRef<SiteCareSearchRecapRow[]> = computed((): SiteCareSearchRecapRow[] => {
+  const sourceLabel: string =
+    searchOptions.value?.sources.find(
+      (source: SiteCareSearchLabelledChoice<SiteCareSearchSource>): boolean => source.key === selectedSource.value,
+    )?.label ?? ''
+  const countLabel: string = `${wantedProspectCount.value.toLocaleString('fr-FR')} prospects au plus`
+  if (isSearchingOpenMap.value) {
+    const departmentLabels: string[] = labelsOfSelectedChoices(
+      searchOptions.value?.open_map.departments ?? [],
+      selectedDepartmentCodes.value,
+    )
+    const familyLabels: string[] = labelsOfSelectedChoices(
+      searchOptions.value?.open_map.families ?? [],
+      selectedFamilyKeys.value,
+    )
+    return [
+      { label: 'Source', value: sourceLabel },
+      { label: 'Zone', value: departmentLabels.join(', ') || 'À choisir' },
+      { label: 'Entreprises', value: familyLabels.join(', ') || 'Toutes' },
+      { label: 'Sites gardés', value: KEEP_RULE_SHORT_LABELS[selectedKeepRule.value] },
+      { label: 'Nombre', value: countLabel },
+    ]
+  }
+  return [
+    { label: 'Source', value: sourceLabel },
+    { label: 'Pays', value: selectedCountry.value?.label ?? 'Aucun' },
+    {
+      label: 'Métiers',
+      value:
+        selectedTradeChoices.value.map((trade: SiteCareSearchTradeChoice): string => trade.label).join(', ') || 'Tous',
+    },
+    { label: 'Villes', value: cities.value.join(', ') || 'Choisies par l’app' },
+    { label: 'Nombre', value: countLabel },
+  ]
+})
 
 /**
  * How many businesses of a trade are available in a country.
@@ -639,27 +522,27 @@ function availableTradeCount(trade: SiteCareSearchTradeOption, countryCode: stri
 }
 
 /**
- * Write a count with its noun, singular or plural.
- * @param count - The count.
- * @param singular - The noun for one.
- * @param plural - The noun for several.
- * @returns The count followed by its noun (« 50 prospects »).
+ * Read the labels of the choices picked, in the order the choices are offered.
+ * @param choices - The choices offered.
+ * @param selectedKeys - The keys of those picked.
+ * @returns The labels of the picked ones.
  */
-function countedLabel(count: number, singular: string, plural: string): string {
-  return `${count} ${count > 1 ? plural : singular}`
+function labelsOfSelectedChoices(choices: SiteCareSearchLabelledChoice[], selectedKeys: string[]): string[] {
+  return choices
+    .filter((choice: SiteCareSearchLabelledChoice): boolean => selectedKeys.includes(choice.key))
+    .map((choice: SiteCareSearchLabelledChoice): string => choice.label)
 }
 
 /**
- * Classes of a chip that can be picked: filled once picked, outlined otherwise, a finger wide in both cases.
- * @param isSelected - Whether the chip is picked.
- * @returns The Tailwind classes of the chip.
+ * Tick a key of a list of choices, or untick it.
+ * @param selectedKeys - The keys ticked.
+ * @param clickedKey - The key clicked.
+ * @returns The keys ticked afterwards.
  */
-function choiceChipClass(isSelected: boolean): string {
-  const base: string =
-    'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-[var(--app-ink-soft)] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50'
-  return isSelected
-    ? `${base} border-[var(--app-ink)] bg-[var(--app-ink)] text-[var(--app-bg)]`
-    : `${base} border-[var(--app-line)] text-[var(--app-ink-soft)] hover:border-[var(--app-ink-soft)]`
+function toggleKey(selectedKeys: string[], clickedKey: string): string[] {
+  return selectedKeys.includes(clickedKey)
+    ? selectedKeys.filter((selectedKey: string): boolean => selectedKey !== clickedKey)
+    : [...selectedKeys, clickedKey]
 }
 
 /**
@@ -667,9 +550,15 @@ function choiceChipClass(isSelected: boolean): string {
  * @param tradeKey - The key of the trade clicked.
  */
 function toggleTrade(tradeKey: string): void {
-  selectedTradeKeys.value = selectedTradeKeys.value.includes(tradeKey)
-    ? selectedTradeKeys.value.filter((selectedKey: string): boolean => selectedKey !== tradeKey)
-    : [...selectedTradeKeys.value, tradeKey]
+  selectedTradeKeys.value = toggleKey(selectedTradeKeys.value, tradeKey)
+}
+
+/**
+ * Tick a family of businesses, or untick it.
+ * @param familyKey - The key of the family clicked.
+ */
+function toggleFamily(familyKey: string): void {
+  selectedFamilyKeys.value = toggleKey(selectedFamilyKeys.value, familyKey)
 }
 
 /**
@@ -686,16 +575,54 @@ function selectCountry(countryCode: string): void {
     .map((trade: SiteCareSearchTradeOption): string => trade.key)
 }
 
+/** Add the city typed to the list, once, then empty the field. */
+function addTypedCity(): void {
+  const typedCity: string = cityInput.value.trim()
+  const isAlreadyListed: boolean = cities.value.some(
+    (city: string): boolean => city.toLowerCase() === typedCity.toLowerCase(),
+  )
+  if (typedCity !== '' && !isAlreadyListed) {
+    cities.value = [...cities.value, typedCity]
+  }
+  cityInput.value = ''
+}
+
 /**
- * Read the labels of the choices picked, in the order the choices are offered.
- * @param choices - The choices offered.
- * @param selectedKeys - The keys of those picked.
- * @returns The labels of the picked ones.
+ * Take a city out of the list.
+ * @param removedCity - The city to remove.
  */
-function labelsOfSelectedChoices(choices: SiteCareSearchLabelledChoice[], selectedKeys: string[]): string[] {
-  return choices
-    .filter((choice: SiteCareSearchLabelledChoice): boolean => selectedKeys.includes(choice.key))
-    .map((choice: SiteCareSearchLabelledChoice): string => choice.label)
+function removeCity(removedCity: string): void {
+  cities.value = cities.value.filter((city: string): boolean => city !== removedCity)
+}
+
+/**
+ * Show a step and bring the page back to its top.
+ * @param step - The step to show.
+ */
+function showStep(step: SiteCareSearchStep): void {
+  launchFailureMessage.value = null
+  currentStep.value = step
+  scrollToTop()
+}
+
+/** Go on to the next step, keeping a city still in the field. */
+function goToNextStep(): void {
+  if (!canContinue.value) {
+    return
+  }
+  addTypedCity()
+  const nextStep: SiteCareSearchStep | undefined = SEARCH_STEPS[SEARCH_STEPS.indexOf(currentStep.value) + 1]
+  if (nextStep !== undefined) {
+    showStep(nextStep)
+  }
+}
+
+/** Go back to the previous step. */
+function goToPreviousStep(): void {
+  const previousStep: SiteCareSearchStep | undefined = SEARCH_STEPS[SEARCH_STEPS.indexOf(currentStep.value) - 1]
+  if (previousStep !== undefined) {
+    showStep(previousStep)
+  }
 }
 
 /**
@@ -723,43 +650,6 @@ function buildSearchPayload(): SiteCareSearchCreatePayload | null {
     cities: cities.value,
     count: wantedProspectCount.value,
   }
-}
-
-/** Add the city typed to the list, once, then empty the field. */
-function addTypedCity(): void {
-  const typedCity: string = cityInput.value.trim()
-  const isAlreadyListed: boolean = cities.value.some(
-    (city: string): boolean => city.toLowerCase() === typedCity.toLowerCase(),
-  )
-  if (typedCity !== '' && !isAlreadyListed) {
-    cities.value = [...cities.value, typedCity]
-  }
-  cityInput.value = ''
-}
-
-/**
- * Take a city out of the list.
- * @param removedCity - The city to remove.
- */
-function removeCity(removedCity: string): void {
-  cities.value = cities.value.filter((city: string): boolean => city !== removedCity)
-}
-
-/**
- * Show a step and bring the page back to its top, keeping a city still in the field; no move once launched.
- * @param step - Target step (1-based).
- */
-function goToStep(step: number): void {
-  if (isLaunching.value || launchedSearch.value !== null) {
-    return
-  }
-
-  if (step > currentStep.value && !canContinue.value) {
-    return
-  }
-  addTypedCity()
-  currentStep.value = Math.min(Math.max(step, 1), SEARCH_STEPS.length)
-  scrollToTop()
 }
 
 /**
@@ -793,6 +683,7 @@ async function launchSearch(): Promise<void> {
   launchFailureMessage.value = null
   try {
     launchedSearch.value = await SiteCareService.startSearch(payload)
+    scrollToTop()
   } catch (error: unknown) {
     launchFailureMessage.value = SiteCareService.failureMessage(
       error,
@@ -812,25 +703,3 @@ onMounted(async (): Promise<void> => {
   await loadSearchOptions()
 })
 </script>
-
-<style scoped>
-.wizard-step {
-  animation: wizard-step-in 0.3s ease;
-}
-@keyframes wizard-step-in {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wizard-step {
-    animation: none;
-  }
-}
-</style>

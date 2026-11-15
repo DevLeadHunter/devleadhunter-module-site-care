@@ -224,6 +224,20 @@ KIND_LABELS: dict[IssueKind, str] = {
     IssueKind.OK: "Rien à signaler",
     IssueKind.REVIEW: "À revoir",
 }
+# The colour of a tag: red for what endangers the site, amber for an old version, quiet for the rest.
+KIND_TONES: dict[IssueKind, str] = {
+    IssueKind.HACK: "red",
+    IssueKind.SECURITY: "red",
+    IssueKind.RISK: "amber",
+    IssueKind.LATE: "amber",
+    IssueKind.MAIL: "neutral",
+    IssueKind.MOBILE: "neutral",
+    IssueKind.CONTACT: "neutral",
+    IssueKind.DATED: "neutral",
+    IssueKind.GOOGLE: "neutral",
+    IssueKind.OK: "green",
+    IssueKind.REVIEW: "neutral",
+}
 # How « Aussi : … » names the other issues of a site.
 KIND_WORDS: dict[IssueKind, str] = {
     IssueKind.HACK: "piratage",

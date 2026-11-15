@@ -1,10 +1,15 @@
-"""Screenshots of the module's real pages against the throwaway local API. Usage: shoot_pages.py [name_filter]"""
+"""
+Screenshots of the module's real pages against the throwaway local API. Usage: shoot_pages.py [name_filter]
+
+Filters: list, site, search, watch, care, settings, menu, page.
+"""
 
 from __future__ import annotations
 
 import contextlib
 import json
 import pathlib
+import re
 import sys
 import urllib.request
 
@@ -62,28 +67,28 @@ with sync_playwright() as playwright:
         settle(page, 4)
         shot(page, "list-to-write")
         page.set_viewport_size({"width": 820, "height": 1180})
-        page.get_by_role("tab", name="Sans email").click()
+        page.get_by_role("button", name=re.compile(r"^Sans email")).click()
         settle(page, 1.5)
         shot(page, "list-no-email")
-        page.get_by_role("tab", name="Tous").click()
-        settle(page, 1.5)
-        shot(page, "list-all")
 
-    if wanted("drawer"):
-        page.set_viewport_size({"width": 820, "height": 2600})
+    if wanted("site"):
+        page.set_viewport_size({"width": 820, "height": 2400})
         page.goto(f"{WEB}/dashboard/site-care", timeout=240_000)
         settle(page, 3)
-        page.get_by_role("button", name="Jardins Guillot").first.click()
-        settle(page, 2)
-        shot(page, "drawer")
+        page.get_by_role("button", name=re.compile(r"^Traiter")).click()
+        settle(page, 3)
+        shot(page, "site-1-finding")
+        page.get_by_role("button", name="Relire le message").click()
+        settle(page, 1.5)
+        shot(page, "site-2-message")
 
     if wanted("search"):
-        page.set_viewport_size({"width": 820, "height": 1400})
+        page.set_viewport_size({"width": 820, "height": 1600})
         page.goto(f"{WEB}/dashboard/site-care/search", timeout=240_000)
         settle(page, 3)
-        shot(page, "search-1-target")
-        for name in ("search-2-zone", "search-3-criteria", "search-4-launch"):
-            page.get_by_role("button", name="Suivant").click()
+        shot(page, "search-1-source")
+        for name in ("search-2-zone", "search-3-count"):
+            page.get_by_role("button", name="Continuer").click()
             settle(page, 1)
             shot(page, name)
 
@@ -100,10 +105,14 @@ with sync_playwright() as playwright:
         shot(page, "care-plans")
 
     if wanted("settings"):
-        page.set_viewport_size({"width": 820, "height": 3000})
+        page.set_viewport_size({"width": 820, "height": 1600})
         page.goto(f"{WEB}/dashboard/settings/site-care", timeout=240_000)
         settle(page, 3)
-        shot(page, "settings")
+        shot(page, "settings-prices")
+        for tab_name, name in (("Quand écrire", "settings-trigger"), ("Points regardés", "settings-points")):
+            page.get_by_role("tab", name=tab_name).click()
+            settle(page, 1)
+            shot(page, name)
 
     if wanted("menu"):
         page.set_viewport_size({"width": 1366, "height": 900})

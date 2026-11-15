@@ -36,4 +36,5 @@ class CarePlanListResponse(BaseModel):
     """The clients under care."""
 
     stats: CarePlanStats
+    summary_line: str | None = None
     plans: list[CarePlanView]

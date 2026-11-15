@@ -6,6 +6,7 @@ import asyncio
 import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -28,6 +29,7 @@ from services.product_module_service import product_module_service
 from devleadhunter_site_care.models.site import SiteCareSite
 from devleadhunter_site_care.models.watch_event import SiteCareWatchEvent
 from devleadhunter_site_care.module import SiteCareModule
+from devleadhunter_site_care.services import owner_settings_service as owner_settings_service_module
 from devleadhunter_site_care.services.search_service import search_service
 from devleadhunter_site_care.services.site_reader import SiteReader, SiteReading
 from devleadhunter_site_care.services.watch_service import watch_service
@@ -173,15 +175,18 @@ class TestSearch:
             "all": 3,
         }
         assert [site["business_name"] for site in listing["sites"]] == ["Jardins Guillot"]
+        assert listing["summary_line"] == "3 sites regardés de l’extérieur. 1 mérite un message."
+        assert listing["writing_queue_label"] == "Traiter le site à écrire"
         assert listing["sites"][0]["lead"] == {
             "kind": "risk",
             "kind_label": "Version à risque",
-            "tone": "red",
+            "tone": "amber",
             "tech": "PHP 7.4",
             "sentence": "Plus de correctif de sécurité depuis 2022",
         }
         assert listing["sites"][0]["state"] == {"key": "to_write", "label": "À écrire", "tone": "ink"}
         assert listing["sites"][0]["email"] == "contact@jardins-guillot.test"
+        assert listing["sites"][0]["price_label"] == "190 €"
 
     def test_a_network_s_site_and_a_platform_page_are_left_out(
         self,
@@ -249,6 +254,11 @@ class TestSheet:
         assert [point["kind_label"] for point in site_to_write["watches"]] == ["E-mails"]
         assert site_to_write["also"] == "Aussi : e-mails"
         assert site_to_write["good_line"].startswith("10 points sont bons : le cadenas,")
+        assert len(site_to_write["good_points"]) == 10
+        assert site_to_write["good_points"][:2] == ["Le cadenas", "Le logiciel du site"]
+        assert site_to_write["price_label"] == "190 €"
+        assert site_to_write["email_source_label"] == "Trouvée sur son site"
+        assert [point["tone"] for point in site_to_write["fixes"] + site_to_write["watches"]] == ["amber", "neutral"]
         assert site_to_write["offer"] == [{"label": "Passage à une version de PHP suivie", "price_label": "190 €"}]
         assert site_to_write["monthly_label"] == "100 € par mois"
         assert site_to_write["message"]["subject"] == "La version de PHP de votre site"
@@ -373,6 +383,39 @@ class TestSettings:
         sheet = client.get(f"{_SITES}/{site_to_write['id']}", headers=auth_headers).json()
         # Without the PHP point, only the DMARC rule is left to watch: nothing to write about.
         assert (sheet["tab"], sheet["fixes"], sheet["lead"]["kind"]) == ("nothing", [], "mail")
+        assert sheet["price_label"] is None
+
+    def test_the_name_the_site_and_the_photo_come_from_the_profile(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        db: Session,
+        owner: User,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(
+            owner_settings_service_module, "core_settings", SimpleNamespace(r2_public_base_url="https://media.test")
+        )
+        monkeypatch.setattr(
+            owner_settings_service_module.r2_storage, "public_url", lambda key: f"https://media.test/{key}"
+        )
+        owner.company_website_url = "https://dibodev.test"
+        owner.profile_photo_path = "profile-photos/leo.jpg"
+        db.commit()
+        settings = client.get("/api/v1/site-care/settings", headers=auth_headers).json()
+        settings["presenter"].update(
+            name="Quelqu’un d’autre", site_url="https://ailleurs.test", role="développeur web à Rennes"
+        )
+
+        saved = client.put("/api/v1/site-care/settings", json=settings, headers=auth_headers).json()
+
+        assert saved["presenter"] == {
+            "name": "Léo Guillaume",
+            "role": "développeur web à Rennes",
+            "tagline": "Je travaille seul, à distance, pour des entreprises comme la vôtre.",
+            "site_url": "https://dibodev.test",
+            "photo_url": "https://media.test/profile-photos/leo.jpg",
+        }
 
 
 @pytest.mark.usefixtures("site_care_module_switched_on", "background_sessions")
@@ -436,8 +479,9 @@ class TestCareAndWatch:
 
         assert started["state"] == {"key": "care", "label": "En suivi", "tone": "green"}
         assert plans["stats"] == {"client_count": 1, "monthly_revenue_label": "150 €", "reports_due_count": 1}
-        assert (plans["plans"][0]["report_label"], plans["plans"][0]["can_send_report"]) == ("À envoyer", True)
-        assert (report.status_code, report.json()["report_label"]) == (200, "Envoyé")
+        assert (plans["plans"][0]["report_label"], plans["plans"][0]["can_send_report"]) == ("Rapport à envoyer", True)
+        assert plans["summary_line"] == "1 client, 150 € par mois. 1 rapport attend d’être envoyé."
+        assert (report.status_code, report.json()["report_label"]) == (200, "Rapport envoyé")
         assert sender_configured[0]["subject"] == "Le rapport du mois pour jardins-guillot.test"
         assert (again.status_code, again.json()["detail"]) == (409, "Le rapport de ce mois est déjà parti.")
         assert client.delete(f"/api/v1/site-care/care-plans/{plan_id}", headers=auth_headers).status_code == 204

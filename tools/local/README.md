@@ -22,8 +22,8 @@ n'est lu ni cité. Le cœur est cloné à côté de ce dépôt et le module est 
 3. L'API : `python -m uvicorn main:app --port 8040` (même dossier, même `PYTHONPATH`).
 4. Le dashboard et l'hôte des démos du cœur, avec `DLH_PRODUCT_MODULES_DIR` sur le dossier des clones et
    `NUXT_PUBLIC_API_BASE=http://localhost:8040` : ports 5173 et 3001.
-5. `python shoot_pages.py [list|drawer|search|watch|care|settings|page]` capture les écrans dans `shots/`, le jeton
-   posé dans le navigateur (aucun mot de passe tapé).
+5. `python shoot_pages.py [list|site|search|watch|care|settings|menu|page]` capture les écrans dans `shots/`, le
+   jeton posé dans le navigateur (aucun mot de passe tapé).
 
 Une recherche lancée en local lit les domaines `.test` du vivier : ils ne répondent pas, les sites arrivent donc dans
 « À revoir ». C'est attendu.

@@ -56,7 +56,7 @@ def _plan_view(plan: SiteCarePlan, site: SiteCareSite, settings: OwnerSettings, 
         last_check_summary=SheetLines.check_summary(site_service.summary_of(site, settings.writing_rules)),
         last_checked_label=f"Regardé le {FrenchDates.day(site.checked_at.date())}",
         report_state="due" if is_due else "sent",
-        report_label="À envoyer" if is_due else "Envoyé",
+        report_label="Rapport à envoyer" if is_due else "Rapport envoyé",
         report_detail=report_detail,
         monthly_label=f"{Money.euros(plan.monthly_price_cents)} par mois",
         since_label=f"Depuis le {FrenchDates.day(plan.started_at.date())}",
@@ -93,14 +93,27 @@ async def list_care_plans(
     settings: OwnerSettings = owner_settings_service.get(db, current_user.id)
     plans: list[tuple[SiteCarePlan, SiteCareSite]] = care_plan_service.active_plans(db, current_user.id)
     views: list[CarePlanView] = [_plan_view(plan, site, settings, now) for plan, site in plans]
-    return CarePlanListResponse(
-        stats=CarePlanStats(
-            client_count=len(views),
-            monthly_revenue_label=Money.euros(sum(plan.monthly_price_cents for plan, _ in plans)),
-            reports_due_count=sum(1 for view in views if view.report_state == "due"),
-        ),
-        plans=views,
+    stats: CarePlanStats = CarePlanStats(
+        client_count=len(views),
+        monthly_revenue_label=Money.euros(sum(plan.monthly_price_cents for plan, _ in plans)),
+        reports_due_count=sum(1 for view in views if view.report_state == "due"),
     )
+    return CarePlanListResponse(stats=stats, summary_line=_summary_line(stats), plans=views)
+
+
+def _summary_line(stats: CarePlanStats) -> str | None:
+    """« 3 clients, 350 € par mois. 1 rapport attend d’être envoyé. », None while nobody is under care."""
+    if stats.client_count == 0:
+        return None
+    clients: str = f"{stats.client_count} clients" if stats.client_count > 1 else "1 client"
+    due_count: int = stats.reports_due_count
+    if due_count == 0:
+        reports: str = "Tous les rapports du mois sont partis."
+    elif due_count == 1:
+        reports = "1 rapport attend d’être envoyé."
+    else:
+        reports = f"{due_count} rapports attendent d’être envoyés."
+    return f"{clients}, {stats.monthly_revenue_label} par mois. {reports}"
 
 
 @router.post("/{plan_id}/report", response_model=CarePlanView)

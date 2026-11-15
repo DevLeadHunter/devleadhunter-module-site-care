@@ -25,6 +25,7 @@ export type SiteCareCarePlanStats = {
 
 export type SiteCareCarePlanListResponse = {
   stats: SiteCareCarePlanStats
+  summary_line: string | null
   plans: SiteCareCarePlan[]
 }
 

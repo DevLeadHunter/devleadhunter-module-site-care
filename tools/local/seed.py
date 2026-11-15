@@ -197,11 +197,8 @@ async def main() -> None:
             owner.id,
             OwnerSettings(
                 presenter=Presenter(
-                    name="Camille Martin",
                     role="développeuse web à Nantes",
                     tagline="Je travaille seul, à distance, pour des entreprises comme la vôtre.",
-                    site_url="https://camille-martin.example",
-                    photo_url="",
                 )
             ),
         )

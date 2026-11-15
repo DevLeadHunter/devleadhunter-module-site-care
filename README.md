@@ -10,17 +10,18 @@ vend deux choses : une correction à prix fixe et un suivi mensuel.
 - `enabled_by_default = False` : l'interrupteur `site-care` reste à `false` dans `product_modules` tant que le super
   admin ne l'allume pas (Paramètres → Administration → Modules). Coupé, ses routes répondent 404 et sa boucle de fond
   est arrêtée.
-- Il ne vend rien par les campagnes : chaque message part à la main, depuis la fiche d'un prospect.
+- Il ne vend rien par les campagnes : chaque message part à la main, depuis la page d'un site.
 
 ## Ce que fait le module
 
 | Écran | Rôle |
 | --- | --- |
-| Mes prospects (`/dashboard/site-care`) | La seule liste du module. Chaque ligne dit le type de souci (Site piraté, Sécurité, Version à risque, Mise à jour en retard, E-mails…), la technologie (« PHP 7.4 ») et le fait en une phrase. La fiche prépare le message et l'envoie. |
-| Nouvelle recherche (`/dashboard/site-care/search`) | Fait entrer des entreprises dans le module : depuis la base du compte (métier, pays, ville) ou depuis OpenStreetMap (département, type d'entreprise, sites à garder). |
-| Veille (`/dashboard/site-care/watch`) | Ce qui vient de changer sur les sites suivis et les dates qui approchent. |
-| Suivis (`/dashboard/site-care/care-plans`) | Les clients en suivi mensuel et leur rapport du mois. |
-| Réglages (`/dashboard/settings/site-care`) | Prix, quand écrire, points regardés, qui écrit. |
+| Mes prospects (`/dashboard/site-care`) | La seule liste du module, en cartes, rangée en cinq onglets : À écrire, Écrits, Sans email, Rien à signaler, À revoir. Chaque carte dit le type de souci (Site piraté, Sécurité, Version à risque, Mise à jour en retard, E-mails…), la technologie (« PHP 7.4 »), le fait en une phrase et le prix à proposer. « Traiter les N sites » ouvre le premier site à écrire, puis mène de l'un au suivant. |
+| Un site (`/dashboard/site-care/sites/<id>`) | En deux étapes : ce qu'on a vu sur son site, puis le message, qui part par « Envoyer par email ». La carte de droite porte l'action du moment : chercher l'adresse, recontrôler, passer en suivi mensuel ou l'arrêter, retirer de la liste. |
+| Nouvelle recherche (`/dashboard/site-care/search`) | Fait entrer des entreprises dans le module, en trois étapes résumées à droite : où chercher (la base du compte ou OpenStreetMap), la zone (pays, métiers, villes ; ou départements et types d'entreprises), puis les sites à garder et leur nombre. |
+| Veille (`/dashboard/site-care/watch`) | Ce qui vient de changer sur les sites suivis et les dates qui approchent ; un site piraté passe en premier. |
+| Clients en suivi (`/dashboard/site-care/care-plans`) | Les clients en suivi mensuel ; le rapport du mois à envoyer est en tête. |
+| Réglages (`/dashboard/settings/site-care`) | Trois onglets : les prix, quand écrire (avec le métier qui suit « Je suis … » dans le message), les points regardés. Le nom, le site et la photo viennent du profil, commun à tous les modules. |
 | Page pour le prospect (`/bilan/<adresse>` sur l'hôte des démos) | Ce qui a été vu sur son site, en clair. Facultative : le message part sans lien, sauf demande. |
 
 ### D'où viennent les entreprises

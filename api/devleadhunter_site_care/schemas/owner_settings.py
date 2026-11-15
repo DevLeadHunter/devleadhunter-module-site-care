@@ -23,7 +23,12 @@ class PointSwitch(BaseModel):
 
 
 class PresenterView(BaseModel):
-    """Who writes, as the message and the page show him."""
+    """
+    Who writes, as the message and the page show him.
+
+    ``name``, ``site_url`` and ``photo_url`` are read from the owner's profile, common to every module: a ``PUT``
+    ignores them and only stores ``role`` and ``tagline``.
+    """
 
     name: str = Field(default="", max_length=120)
     role: str = Field(default="", max_length=160)

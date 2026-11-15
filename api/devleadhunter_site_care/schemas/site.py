@@ -26,7 +26,7 @@ class SiteState(BaseModel):
 
 
 class SiteListItem(BaseModel):
-    """One line of « Mes prospects »."""
+    """One line of « Mes prospects »; ``price_label`` is the price the message names, None when there is none to write."""
 
     id: int
     business_name: str
@@ -40,6 +40,7 @@ class SiteListItem(BaseModel):
     state: SiteState
     lead: SiteLead
     also: str | None = None
+    price_label: str | None = None
     checked_at: datetime
 
 
@@ -49,6 +50,7 @@ class SitePointView(BaseModel):
     key: str
     kind: str
     kind_label: str
+    tone: str
     tech: str | None = None
     fact: str
 
@@ -89,6 +91,7 @@ class CarePlanBrief(BaseModel):
 class SiteDetail(SiteListItem):
     """The sheet of a site."""
 
+    email_source_label: str | None = None
     phone: str | None = None
     google_rating: float | None = None
     google_reviews_count: int | None = None
@@ -96,6 +99,7 @@ class SiteDetail(SiteListItem):
     unread_text: str | None = None
     fixes: list[SitePointView] = Field(default_factory=list)
     watches: list[SitePointView] = Field(default_factory=list)
+    good_points: list[str] = Field(default_factory=list)
     good_line: str | None = None
     hidden_line: str | None = None
     offer: list[OfferLineView] = Field(default_factory=list)
@@ -128,6 +132,8 @@ class SiteListResponse(BaseModel):
     """A page of « Mes prospects » with the counts of the whole list."""
 
     counts: SiteCounts
+    summary_line: str | None = None
+    writing_queue_label: str | None = None
     tab_counts: dict[str, int]
     trades: list[TradeOption]
     matching_count: int

@@ -10,16 +10,11 @@ export default defineNuxtConfig({
     name: 'site-care',
   },
 
-  // Absolute paths: in a layer, `~/components` is the host app's folder, never this one. Same prefixes as the core.
+  // Absolute path: in a layer, `~/components` is the host app's folder, never this one.
   components: [
-    {
-      path: join(layerDirectory, 'app/components/ui'),
-      prefix: 'Ui',
-    },
     {
       path: join(layerDirectory, 'app/components'),
       pathPrefix: false,
-      ignore: ['**/ui/**'],
     },
   ],
 })

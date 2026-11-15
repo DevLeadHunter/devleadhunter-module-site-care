@@ -22,11 +22,11 @@ class SiteCareOwnerSettings(Base):
         monthly_price_cents: His price of the monthly care.
         trigger: When a site deserves a message (``fix`` or ``watch``).
         disabled_points: The points he does not want looked at.
-        presenter_name: Who writes, as the message and the page name him.
+        presenter_name: No longer read: the name comes from his profile (kept for the rows stored before).
         presenter_role: What he does, in a few words (« développeur web à Rennes »).
         presenter_tagline: One line about him on the page.
-        presenter_site_url: His own site.
-        presenter_photo_url: His portrait on the page.
+        presenter_site_url: His own site as typed here before; read only while his profile has no site.
+        presenter_photo_url: His portrait as typed here before; read only while his profile has no photo.
     """
 
     __tablename__ = "site_care_owner_settings"

@@ -39,7 +39,7 @@ type SiteLead = {
 ```
 
 ```json
-{ "kind": "risk", "kind_label": "Version à risque", "tone": "red", "tech": "PHP 7.4", "sentence": "Plus de correctif de sécurité depuis 2022" }
+{ "kind": "risk", "kind_label": "Version à risque", "tone": "amber", "tech": "PHP 7.4", "sentence": "Plus de correctif de sécurité depuis 2022" }
 ```
 
 ### `SiteState`
@@ -72,6 +72,7 @@ type SiteListItem = {
   state: SiteState
   lead: SiteLead
   also: string | null // les autres soucis du site, null quand il n'y en a qu'un
+  price_label: string | null // « 190 € » ou « Sur devis », null sans message à écrire
   checked_at: string
 }
 ```
@@ -88,8 +89,9 @@ type SiteListItem = {
   "email": "contact@jardins-guillot.example",
   "tab": "to_write",
   "state": { "key": "to_write", "label": "À écrire", "tone": "ink" },
-  "lead": { "kind": "risk", "kind_label": "Version à risque", "tone": "red", "tech": "PHP 7.1", "sentence": "Plus de correctif de sécurité depuis 2019" },
+  "lead": { "kind": "risk", "kind_label": "Version à risque", "tone": "amber", "tech": "PHP 7.1", "sentence": "Plus de correctif de sécurité depuis 2019" },
   "also": "Aussi : version à risque (WordPress 4.9), e-mails",
+  "price_label": "190 €",
   "checked_at": "2026-11-11T15:40:00"
 }
 ```
@@ -101,13 +103,14 @@ type SitePoint = {
   key: PointKey
   kind: IssueKind
   kind_label: string
+  tone: Tone // la couleur du type de souci ; neutral pour un point à surveiller
   tech: string | null
   fact: string
 }
 ```
 
 ```json
-{ "key": "php", "kind": "risk", "kind_label": "Version à risque", "tech": "PHP 7.4", "fact": "Le site tourne avec PHP 7.4, qui ne reçoit plus de correctifs de sécurité depuis novembre 2022." }
+{ "key": "php", "kind": "risk", "kind_label": "Version à risque", "tone": "amber", "tech": "PHP 7.4", "fact": "Le site tourne avec PHP 7.4, qui ne reçoit plus de correctifs de sécurité depuis novembre 2022." }
 ```
 
 ### `SiteDetail`
@@ -126,7 +129,9 @@ type SiteDetail = {
   state: SiteState
   lead: SiteLead
   also: string | null
+  price_label: string | null
   checked_at: string
+  email_source_label: string | null // « Trouvée sur son site », null quand on ne sait pas
   phone: string | null
   google_rating: number | null
   google_reviews_count: number | null
@@ -134,6 +139,7 @@ type SiteDetail = {
   unread_text: string | null // la phrase affichée quand le site est à revoir (tab = review)
   fixes: SitePoint[]
   watches: SitePoint[]
+  good_points: string[] // les points bons, un par ligne : « Le cadenas », « Aucun piratage »
   good_line: string | null
   hidden_line: string | null
   offer: { label: string; price_label: string }[]
@@ -165,8 +171,9 @@ type SiteDetail = {
   "email": "contact@jardins-guillot.example",
   "tab": "written",
   "state": { "key": "written", "label": "Écrit le 9 nov.", "tone": "neutral" },
-  "lead": { "kind": "risk", "kind_label": "Version à risque", "tone": "red", "tech": "PHP 7.4", "sentence": "Plus de correctif de sécurité depuis 2022" },
+  "lead": { "kind": "risk", "kind_label": "Version à risque", "tone": "amber", "tech": "PHP 7.4", "sentence": "Plus de correctif de sécurité depuis 2022" },
   "also": null,
+  "price_label": "190 €",
   "checked_at": "2026-11-11T15:40:00",
   "phone": "02 99 00 00 00",
   "google_rating": 4.7,
@@ -174,9 +181,10 @@ type SiteDetail = {
   "google_maps_url": "https://maps.google.com/?cid=1",
   "unread_text": null,
   "fixes": [
-    { "key": "php", "kind": "risk", "kind_label": "Version à risque", "tech": "PHP 7.4", "fact": "Le site tourne avec PHP 7.4, qui ne reçoit plus de correctifs de sécurité depuis novembre 2022." }
+    { "key": "php", "kind": "risk", "kind_label": "Version à risque", "tone": "amber", "tech": "PHP 7.4", "fact": "Le site tourne avec PHP 7.4, qui ne reçoit plus de correctifs de sécurité depuis novembre 2022." }
   ],
   "watches": [],
+  "good_points": ["Le cadenas", "Le logiciel du site", "Aucun piratage", "L’adresse e-mail", "L’expéditeur des e-mails", "La protection du nom", "Le numéro de la fiche Google", "Le numéro cliquable", "L’année en bas de page", "La lecture sur téléphone", "La présentation dans Google"],
   "good_line": "11 points sont bons : le cadenas, le logiciel du site, aucun piratage, l’adresse e-mail, l’expéditeur des e-mails, la protection du nom, le numéro de la fiche Google, le numéro cliquable, l’année en bas de page, la lecture sur téléphone, la présentation dans Google.",
   "hidden_line": null,
   "offer": [ { "label": "Passage à une version de PHP suivie", "price_label": "190 €" } ],
@@ -231,6 +239,8 @@ type SiteDetail = {
 ```ts
 type SiteListResponse = {
   counts: { total: number; with_email: number; to_fix: number; written: number } // tous les sites de l'utilisateur
+  summary_line: string | null // la phrase sous le titre, null sans aucun site
+  writing_queue_label: string | null // « Traiter les 11 sites », null sans site à écrire
   tab_counts: Record<SiteTab | 'all', number> // tous les sites de l'utilisateur
   trades: { key: string; label: string }[] // les métiers présents, pour le filtre
   matching_count: number // l'onglet et les filtres demandés
@@ -241,6 +251,8 @@ type SiteListResponse = {
 ```json
 {
   "counts": { "total": 136, "with_email": 67, "to_fix": 32, "written": 9 },
+  "summary_line": "136 sites regardés de l’extérieur. 11 méritent un message.",
+  "writing_queue_label": "Traiter les 11 sites",
   "tab_counts": { "to_write": 11, "written": 9, "no_email": 12, "nothing": 89, "review": 15, "all": 136 },
   "trades": [ { "key": "paysagiste", "label": "Paysagistes" } ],
   "matching_count": 11,
@@ -407,17 +419,19 @@ type CarePlan = {
 
 type CarePlanListResponse = {
   stats: { client_count: number; monthly_revenue_label: string; reports_due_count: number }
+  summary_line: string | null // la phrase sous le titre, null sans aucun client
   plans: CarePlan[]
 }
 ```
 
 ```json
 // CarePlanListResponse
-{ "stats": { "client_count": 3, "monthly_revenue_label": "350 €", "reports_due_count": 1 }, "plans": [ CarePlan ] }
+{ "stats": { "client_count": 3, "monthly_revenue_label": "350 €", "reports_due_count": 1 },
+  "summary_line": "3 clients, 350 € par mois. 1 rapport attend d’être envoyé.", "plans": [ CarePlan ] }
 // CarePlan
 { "id": 3, "site_id": 12, "business_name": "Quéré Espaces Verts", "trade_label": "Paysagiste", "city": "Cébazat", "domain": "quere-espaces-verts.example",
   "last_check_summary": "Tout est en ordre.", "last_checked_label": "Regardé le 10 novembre",
-  "report_state": "due", "report_label": "À envoyer", "report_detail": "Premier rapport le 1er décembre",
+  "report_state": "due", "report_label": "Rapport à envoyer", "report_detail": "Premier rapport le 1er décembre",
   "monthly_label": "100 € par mois", "since_label": "Depuis le 10 novembre", "can_send_report": true }
 ```
 
@@ -436,15 +450,19 @@ type Settings = {
   trigger: 'fix' | 'watch' // écrire dès qu'un point est à corriger, ou aussi quand trois points sont à surveiller
   points: { key: PointKey; family_label: string; label: string; is_enabled: boolean }[]
   presenter: {
-    name: string
+    name: string // lu dans le profil
     role: string // suit « je suis {name}, » dans le message et sur la page
     tagline: string // la phrase qui le présente sur la page
-    site_url: string
-    photo_url: string
+    site_url: string // lu dans le profil (site web de l'entreprise)
+    photo_url: string // lu dans le profil (photo de profil, adresse publique)
   }
   sender_email: string | null // en lecture seule, null quand l'envoi n'est pas configuré
 }
 ```
+
+Le nom, le site et la photo viennent du profil, commun à tous les modules : un `PUT` les ignore et n'enregistre que
+`role` et `tagline`. Un site ou une photo saisis dans le module avant la version 1.2 servent encore tant que le profil
+n'en a pas.
 
 ```json
 {
