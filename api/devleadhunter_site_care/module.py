@@ -18,7 +18,15 @@ from services.notification_service import notification_service
 
 from devleadhunter_site_care import MODULE_KEY, MODULE_LABEL
 from devleadhunter_site_care.models.site import SiteCareSite
-from devleadhunter_site_care.routes import care_plans, owner_settings, public_pages, searches, sites, watch
+from devleadhunter_site_care.routes import (
+    assistant,
+    care_plans,
+    owner_settings,
+    public_pages,
+    searches,
+    sites,
+    watch,
+)
 from devleadhunter_site_care.services.worker import site_care_worker
 
 if TYPE_CHECKING:
@@ -67,10 +75,10 @@ class SiteCareModule(ProductModule):
 
     def routers(self) -> list[APIRouter]:
         """
-        The list and its sheets, the searches, the watch, the care plans, the settings and the public page.
+        The list and its sheets, the searches, the watch, the care plans, the settings, the public page and the assistant.
 
         Returns:
-            The six routers, mounted under the API prefix.
+            The seven routers, mounted under the API prefix.
         """
         return [
             sites.router,
@@ -79,6 +87,7 @@ class SiteCareModule(ProductModule):
             care_plans.router,
             owner_settings.router,
             public_pages.router,
+            assistant.router,
         ]
 
     def background_loops(self) -> list[BackgroundLoop]:

@@ -260,6 +260,15 @@ type SiteListResponse = {
 }
 ```
 
+### Assistant
+
+| Méthode et chemin | Corps ou paramètres | Réponse |
+| --- | --- | --- |
+| `GET /site-care/assistant` | | `AssistantHome` : la phrase sous « Assistant » et les questions proposées |
+| `POST /site-care/assistant/questions` | `{ "question": "Les sites piratés à contacter" }` (1 à 500 caractères) | `SiteCareAssistantAnswer` : la réponse en une phrase (`text`), les sites trouvés (`cards`, des `SiteListItem`), un graphique (`chart`) ou le site à regarder d'abord (`highlight`), et les questions pour continuer (`next_questions`) |
+
+Le modèle de langage traduit seulement la question en filtres ; chaque chiffre et chaque site viennent de la base.
+
 ### Nouvelle recherche
 
 | Méthode et chemin | Corps | Réponse |

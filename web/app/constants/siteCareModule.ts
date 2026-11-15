@@ -1,5 +1,6 @@
 import type { ProductModuleKey } from '~/types/ProductModule'
 import type { DashboardModuleDefinition, UiSidebarGroup } from '~/types/UiSidebar'
+import { MODULE_ASSISTANT_ICON, MODULE_ASSISTANT_LABEL } from '~/constants/moduleAssistant'
 
 export const SITE_CARE_MODULE_KEY: ProductModuleKey = 'site-care'
 
@@ -12,6 +13,8 @@ export const SITE_CARE_SEARCH_PATH: string = `${SITE_CARE_SECTION_PATH}/search`
 export const SITE_CARE_WATCH_PATH: string = `${SITE_CARE_SECTION_PATH}/watch`
 
 export const SITE_CARE_CARE_PLANS_PATH: string = `${SITE_CARE_SECTION_PATH}/care-plans`
+
+export const SITE_CARE_ASSISTANT_PATH: string = `${SITE_CARE_SECTION_PATH}/assistant`
 
 export const SITE_CARE_SETTINGS_PATH: string = '/dashboard/settings/site-care'
 
@@ -29,6 +32,7 @@ const SITE_CARE_NAV_GROUPS: UiSidebarGroup[] = [
     links: [
       { to: SITE_CARE_SECTION_PATH, label: 'Mes prospects', icon: 'i-lucide-users' },
       { to: SITE_CARE_WATCH_PATH, label: 'Veille', icon: 'i-lucide-bell' },
+      { to: SITE_CARE_ASSISTANT_PATH, label: MODULE_ASSISTANT_LABEL, icon: MODULE_ASSISTANT_ICON },
       { to: '/dashboard/emails', label: 'Suivi des emails', icon: 'i-lucide-send' },
     ],
   },
@@ -44,6 +48,7 @@ export const SITE_CARE_DASHBOARD_MODULE: DashboardModuleDefinition = {
   icon: 'i-lucide-shield-check',
   home: SITE_CARE_SECTION_PATH,
   primaryCta: { label: 'Trouver des prospects', to: SITE_CARE_SEARCH_PATH, icon: 'i-lucide-search' },
+  tabBarMainAction: { label: MODULE_ASSISTANT_LABEL, to: SITE_CARE_ASSISTANT_PATH, icon: MODULE_ASSISTANT_ICON },
   navGroups: SITE_CARE_NAV_GROUPS,
   activityCategoryLabels: { 'site-care': 'Entretien de sites' },
 }

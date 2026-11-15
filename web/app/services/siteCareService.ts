@@ -1,3 +1,5 @@
+import type { ModuleAssistantHome } from '~/types/ModuleAssistant'
+import type { SiteCareAssistantAnswer } from '../types/SiteCareAssistant'
 import type {
   SiteCareCarePlan,
   SiteCareCarePlanCreatePayload,
@@ -186,6 +188,23 @@ export class SiteCareService {
    */
   static saveSettings(settings: SiteCareSettings): Promise<SiteCareSettings> {
     return ApiClient.put<SiteCareSettings>(`${SITE_CARE_API_BASE}/settings`, settings)
+  }
+
+  /**
+   * Read what the assistant shows before the first question.
+   * @returns The sentence under the title and the questions offered.
+   */
+  static getAssistantHome(): Promise<ModuleAssistantHome> {
+    return ApiClient.get<ModuleAssistantHome>(`${SITE_CARE_API_BASE}/assistant`)
+  }
+
+  /**
+   * Ask the assistant a question about the sites.
+   * @param question - The owner's words.
+   * @returns The answer, its figures and cards read from the owner's own data.
+   */
+  static askAssistant(question: string): Promise<SiteCareAssistantAnswer> {
+    return ApiClient.post<SiteCareAssistantAnswer>(`${SITE_CARE_API_BASE}/assistant/questions`, { question })
   }
 
   /**

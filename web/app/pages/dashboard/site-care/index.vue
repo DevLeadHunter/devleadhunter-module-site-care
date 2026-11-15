@@ -127,56 +127,7 @@
           :class="{ 'opacity-60': isLoadingSites }"
           :aria-busy="isLoadingSites"
         >
-          <SiteCareLinkCard
-            v-for="listedSite in sites"
-            :key="listedSite.id"
-            :to="`${SITE_CARE_SITES_PATH}/${listedSite.id}`"
-          >
-            <div class="mb-2.5 flex flex-wrap items-center gap-2">
-              <SiteCareIssueTag
-                :kind="listedSite.lead.kind"
-                :label="listedSite.lead.kind_label"
-                :tone="listedSite.lead.tone"
-              />
-              <SiteCareTechnologyChip v-if="listedSite.lead.tech" :technology="listedSite.lead.tech" />
-            </div>
-            <h2 class="text-base leading-snug font-semibold tracking-[-0.01em] text-[var(--app-ink)]">
-              {{ listedSite.lead.sentence }}
-            </h2>
-            <p v-if="listedSite.also" class="mt-1.5 text-sm text-[var(--app-ink-soft)]">{{ listedSite.also }}</p>
-
-            <div class="mt-auto pt-3">
-              <div class="flex items-center gap-3 border-t border-[var(--app-line)] pt-3">
-                <span
-                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--app-surface-2)] text-[13px] font-semibold text-[var(--app-ink-soft)]"
-                  aria-hidden="true"
-                >
-                  {{ SiteCareBusinessLabels.initialsOf(listedSite.business_name) }}
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-semibold text-[var(--app-ink)]">{{
-                    listedSite.business_name
-                  }}</span>
-                  <span class="block truncate text-sm text-[var(--app-ink-soft)]">
-                    {{ SiteCareBusinessLabels.placeOf(listedSite.trade_label, listedSite.city) }}
-                  </span>
-                </span>
-                <span v-if="isOfferShown(listedSite)" class="shrink-0 text-right">
-                  <span class="block text-base leading-tight font-semibold text-[var(--app-ink)]">
-                    {{ listedSite.price_label }}
-                  </span>
-                  <span class="block text-xs font-medium text-[var(--app-ink-soft)]">à proposer</span>
-                </span>
-                <span
-                  v-else
-                  class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
-                  :class="SITE_CARE_TONE_CLASSES[listedSite.state.tone]"
-                >
-                  {{ listedSite.state.label }}
-                </span>
-              </div>
-            </div>
-          </SiteCareLinkCard>
+          <SiteCareSitePreviewCard v-for="listedSite in sites" :key="listedSite.id" :site="listedSite" />
         </div>
 
         <p
@@ -229,7 +180,6 @@ import {
   SITE_CARE_ISSUE_KIND_FILTERS,
   SITE_CARE_SITE_TAB_HINTS,
   SITE_CARE_SITE_TABS,
-  SITE_CARE_TONE_CLASSES,
 } from '../../../constants/siteCareLabels'
 import {
   SITE_CARE_SEARCH_PATH,
@@ -238,7 +188,6 @@ import {
   SITE_CARE_WRITING_QUEUE_QUERY,
 } from '../../../constants/siteCareModule'
 import { SiteCareService } from '../../../services/siteCareService'
-import { SiteCareBusinessLabels } from '../../../utils/siteCareBusinessLabels'
 
 definePageMeta({ layout: 'dashboard', middleware: ['auth', 'site-care-module'] })
 
@@ -366,15 +315,6 @@ function parseIssueKind(value: string | null): SiteCareIssueKind | null {
 function parseSiteId(value: string | null): number | null {
   const siteId: number = Number(value)
   return value !== null && Number.isInteger(siteId) && siteId > 0 ? siteId : null
-}
-
-/**
- * Whether a card shows the price to offer rather than its state: only while the site waits for its message.
- * @param listedSite - The site of the card.
- * @returns True for a site to write that has a price.
- */
-function isOfferShown(listedSite: SiteCareSiteListItem): boolean {
-  return listedSite.state.key === 'to_write' && listedSite.price_label !== null
 }
 
 /**
