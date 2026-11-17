@@ -33,6 +33,14 @@ class PointState(StrEnum):
     UNKNOWN = "unknown"
 
 
+class WatchEventKind(StrEnum):
+    """What a check found on a site that the previous one had not."""
+
+    HACKED = "hacked"
+    UNREACHABLE = "unreachable"
+    WORSE = "worse"
+
+
 class IssueKind(StrEnum):
     """The kind of issue a point is, as the list names it at a glance."""
 

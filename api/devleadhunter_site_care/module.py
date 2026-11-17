@@ -16,7 +16,7 @@ from core.clock import naive_utc_now
 from core.product_modules.contract import BackgroundLoop, ProductModule
 from services.notification_service import notification_service
 
-from devleadhunter_site_care import MODULE_KEY, MODULE_LABEL
+from devleadhunter_site_care import MODULE_KEY, MODULE_LABEL, NOTIFICATION_TAG
 from devleadhunter_site_care.models.site import SiteCareSite
 from devleadhunter_site_care.routes import (
     assistant,
@@ -63,7 +63,7 @@ class SiteCareModule(ProductModule):
         "sur le point à corriger, veille et suivi mensuel."
     )
     enabled_by_default: ClassVar[bool] = False
-    notification_tag: ClassVar[str] = "🛠️ Entretien de sites"
+    notification_tag: ClassVar[str] = NOTIFICATION_TAG
     demo_beacon_prefix: ClassVar[str | None] = "site_care_"
 
     # Tracked by name in schema_migrations: a name never changes once it ran in production.

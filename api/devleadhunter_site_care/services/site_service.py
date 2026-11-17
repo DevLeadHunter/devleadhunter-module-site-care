@@ -20,6 +20,7 @@ from devleadhunter_site_care.catalog import (
     PointState,
     SiteStatus,
     SiteTab,
+    WatchEventKind,
 )
 from devleadhunter_site_care.models.site import SiteCareSite
 from devleadhunter_site_care.models.watch_event import SiteCareWatchEvent
@@ -490,21 +491,46 @@ class SiteService:
         is_first_check: bool,
         stopped_answering: bool,
     ) -> None:
-        """Record what a check found that the previous one had not: a hack, a site gone, a point that got worse."""
+        """
+        Record what a check found that the previous one had not: a hack, a site gone, a point that got worse.
+
+        A point the previous check could not read (the site did not answer that day, or hides the fact) is not said
+        to have got worse: nothing tells it was fine before. A hack is recorded all the same, once per site.
+        """
         if site.id is None:
             db.flush()
         if stopped_answering:
-            db.add(SiteCareWatchEvent(user_id=site.user_id, site_id=site.id, kind="unreachable"))
+            db.add(SiteCareWatchEvent(user_id=site.user_id, site_id=site.id, kind=WatchEventKind.UNREACHABLE.value))
             return
         for point in points:
-            if point.state != PointState.FIX or previous_states.get(point.key.value) == PointState.FIX.value:
+            previous_state: str | None = previous_states.get(point.key.value)
+            if point.state != PointState.FIX or previous_state == PointState.FIX.value:
                 continue
+            is_previous_state_unknown: bool = previous_state == PointState.UNKNOWN.value
             if point.key == PointKey.HACKED:
-                db.add(SiteCareWatchEvent(user_id=site.user_id, site_id=site.id, kind="hacked"))
-            elif not is_first_check:
+                if not (is_previous_state_unknown and SiteService._has_earlier_hacked_event(db, site.id)):
+                    db.add(SiteCareWatchEvent(user_id=site.user_id, site_id=site.id, kind=WatchEventKind.HACKED.value))
+            elif not is_first_check and not is_previous_state_unknown:
                 db.add(
-                    SiteCareWatchEvent(user_id=site.user_id, site_id=site.id, kind="worse", point_key=point.key.value)
+                    SiteCareWatchEvent(
+                        user_id=site.user_id,
+                        site_id=site.id,
+                        kind=WatchEventKind.WORSE.value,
+                        point_key=point.key.value,
+                    )
                 )
+
+    @staticmethod
+    def _has_earlier_hacked_event(db: Session, site_id: int) -> bool:
+        """Whether an earlier check already recorded this site as hacked."""
+        return (
+            db.execute(
+                select(SiteCareWatchEvent.id)
+                .where(SiteCareWatchEvent.site_id == site_id, SiteCareWatchEvent.kind == WatchEventKind.HACKED.value)
+                .limit(1)
+            ).first()
+            is not None
+        )
 
     @staticmethod
     def _count(db: Session, condition: ColumnElement[bool]) -> int:

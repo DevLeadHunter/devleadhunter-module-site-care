@@ -26,6 +26,7 @@ from devleadhunter_site_care.services.owner_settings_service import owner_settin
 from devleadhunter_site_care.services.site_points import FrenchDates, SitePoint
 from devleadhunter_site_care.services.site_reader import SiteReader, SiteReading
 from devleadhunter_site_care.services.site_service import site_service
+from devleadhunter_site_care.services.watch_notifier import WatchNotification, watch_notifier
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ class WatchService:
         return [line for _, line in sorted(dated, key=lambda entry: entry[0])]
 
     async def recheck_due_sites(self) -> None:
-        """Read again a few sites whose check is old, at most once every few minutes."""
+        """Read again a few sites whose check is old, at most once every few minutes, and tell what that found."""
         now_monotonic: float = time.monotonic()
         if now_monotonic < self._next_pass_after:
             return
@@ -181,12 +182,17 @@ class WatchService:
         async with SiteReader() as reader:
             readings: list[SiteReading] = [await reader.read(website) for _, website in due]
         with SessionLocal() as db:
+            event_id_before_pass: int = watch_notifier.latest_event_id(db)
             for (site_id, _), reading in zip(due, readings, strict=True):
                 site: SiteCareSite | None = db.get(SiteCareSite, site_id)
                 if site is None or site.archived_at is not None:
                     continue
                 await site_service.apply_reading(db, site, reading, owner_settings_service.get(db, site.user_id))
             db.commit()
+            pass_notifications: list[WatchNotification] = watch_notifier.notifications_of_pass(
+                db, [site_id for site_id, _ in due], event_id_before_pass, naive_utc_now()
+            )
+        await watch_notifier.send(pass_notifications)
 
     @staticmethod
     def _seen_label(moment: datetime, now: datetime) -> str:
