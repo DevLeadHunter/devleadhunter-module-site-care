@@ -1,5 +1,9 @@
 <template>
-  <UiModuleAssistantChat :load-home="SiteCareService.getAssistantHome" :ask-question="SiteCareService.askAssistant">
+  <UiModuleAssistantChat
+    conversation-key="site-care"
+    :load-home="SiteCareService.getAssistantHome"
+    :ask-question="SiteCareService.askAssistant"
+  >
     <template #card="{ card }">
       <SiteCareSitePreviewCard :site="card" />
     </template>

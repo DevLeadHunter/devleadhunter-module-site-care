@@ -1,4 +1,4 @@
-import type { ModuleAssistantHome } from '~/types/ModuleAssistant'
+import type { ModuleAssistantHome, ModuleAssistantPastExchange } from '~/types/ModuleAssistant'
 import type { SiteCareAssistantAnswer } from '../types/SiteCareAssistant'
 import type {
   SiteCareCarePlan,
@@ -201,10 +201,14 @@ export class SiteCareService {
   /**
    * Ask the assistant a question about the sites.
    * @param question - The owner's words.
+   * @param history - The conversation so far, oldest first, so a follow-up question keeps its thread.
    * @returns The answer, its figures and cards read from the owner's own data.
    */
-  static askAssistant(question: string): Promise<SiteCareAssistantAnswer> {
-    return ApiClient.post<SiteCareAssistantAnswer>(`${SITE_CARE_API_BASE}/assistant/questions`, { question })
+  static askAssistant(question: string, history: ModuleAssistantPastExchange[]): Promise<SiteCareAssistantAnswer> {
+    return ApiClient.post<SiteCareAssistantAnswer>(`${SITE_CARE_API_BASE}/assistant/questions`, {
+      question,
+      history,
+    })
   }
 
   /**

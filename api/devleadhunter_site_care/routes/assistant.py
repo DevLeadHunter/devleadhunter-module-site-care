@@ -5,13 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from core.clock import naive_utc_now
 from core.database import get_db
 from models.user import User
 from schemas.module_assistant import AssistantHome, AssistantQuestion
 from services.auth_service import get_current_active_user
 
 from devleadhunter_site_care.schemas.assistant import SiteCareAssistantAnswer
-from devleadhunter_site_care.services.assistant_service import AssistantRequest, assistant_service
+from devleadhunter_site_care.services.assistant_service import assistant_service
 
 router = APIRouter(prefix="/site-care/assistant", tags=["site-care-assistant"])
 
@@ -28,9 +29,5 @@ async def ask(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> SiteCareAssistantAnswer:
-    """Answer a question from the owner's own sites."""
-    user_id: int = current_user.id
-    # The connection goes back to the pool while the language model reads the question.
-    db.commit()
-    request: AssistantRequest = await assistant_service.understand(body.question.strip())
-    return assistant_service.respond(db, user_id, request)
+    """Answer a question of the conversation from the owner's own sites."""
+    return await assistant_service.answer(db, current_user.id, body.question.strip(), body.history, naive_utc_now())

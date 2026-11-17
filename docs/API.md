@@ -265,9 +265,9 @@ type SiteListResponse = {
 | Méthode et chemin | Corps ou paramètres | Réponse |
 | --- | --- | --- |
 | `GET /site-care/assistant` | | `AssistantHome` : la phrase sous « Assistant » et les questions proposées |
-| `POST /site-care/assistant/questions` | `{ "question": "Les sites piratés à contacter" }` (1 à 500 caractères) | `SiteCareAssistantAnswer` : la réponse en une phrase (`text`), les sites trouvés (`cards`, des `SiteListItem`), un graphique (`chart`) ou le site à regarder d'abord (`highlight`), et les questions pour continuer (`next_questions`) |
+| `POST /site-care/assistant/questions` | `{ "question": "Les sites piratés à contacter", "history": [{ "question", "answer", "context" }] }` (question de 1 à 500 caractères, douze échanges passés au plus) | `SiteCareAssistantAnswer` : la réponse (`text`), les sites trouvés (`cards`, des `SiteListItem`), un graphique (`chart`) ou l'encadré à regarder d'abord (`highlight`), les questions pour continuer (`next_questions`) et `context`, le résumé de ce qui a été lu, que la page renvoie tel quel dans `history` |
 
-Le modèle de langage traduit seulement la question en filtres ; chaque chiffre et chaque site viennent de la base.
+Claude tient la conversation et choisit parmi six outils qui lisent la base : chercher des sites, les répartir, le suivi des messages, la fiche d'un site, la veille, les clients en suivi. Il écrit la phrase ; les sites, le graphique et l'encadré viennent des outils, jamais du modèle, et une réponse qui cite un nombre qu'aucun outil n'a donné est redemandée puis remplacée. Sans clé `ANTHROPIC_API_KEY`, ou si Claude ne répond pas, les mots de la question choisissent un seul outil.
 
 ### Nouvelle recherche
 
