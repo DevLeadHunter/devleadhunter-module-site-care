@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from core.clock import naive_utc_now
 from core.database import get_db
 from models.user import User
 from services.auth_service import get_current_active_user
@@ -26,6 +27,7 @@ from devleadhunter_site_care.services.owner_settings_service import OwnerSetting
 from devleadhunter_site_care.services.send_service import send_service
 from devleadhunter_site_care.services.site_service import SiteCareError, site_service
 from devleadhunter_site_care.services.site_views import site_views
+from devleadhunter_site_care.services.watch_service import WatchDate, watch_service
 
 router = APIRouter(prefix="/site-care/sites", tags=["site-care-sites"])
 
@@ -54,13 +56,22 @@ async def list_sites(
     trade: str | None = Query(None, max_length=80),
     kind: IssueKind | None = Query(None),
     q: str | None = Query(None, max_length=120),
+    watch_date: str | None = Query(None, max_length=40),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ) -> SiteListResponse:
-    """A page of the user's sites, with the counts of the whole list."""
+    """
+    A page of the user's sites, with the counts of the whole list.
+
+    ``watch_date`` narrows the page to the sites one date of the watch concerns; a date that concerns no site any
+    more is ignored.
+    """
     settings: OwnerSettings = owner_settings_service.get(db, current_user.id)
+    narrowing_date: WatchDate | None = (
+        watch_service.upcoming_date(db, current_user.id, watch_date, naive_utc_now()) if watch_date else None
+    )
     listing = site_service.list_sites(
         db,
         current_user.id,
@@ -70,8 +81,11 @@ async def list_sites(
         text=q,
         limit=limit,
         offset=offset,
+        site_ids=[site.id for site in narrowing_date.sites] if narrowing_date else None,
     )
-    return site_views.list_response(db, listing, settings)
+    return site_views.list_response(
+        db, listing, settings, watch_date_label=narrowing_date.line.title if narrowing_date else None
+    )
 
 
 @router.get("/{site_id}", response_model=SiteDetail)

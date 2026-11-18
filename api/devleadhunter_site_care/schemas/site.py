@@ -129,11 +129,17 @@ class TradeOption(BaseModel):
 
 
 class SiteListResponse(BaseModel):
-    """A page of « Mes prospects » with the counts of the whole list."""
+    """
+    A page of « Mes prospects » with the counts of the whole list.
+
+    ``watch_date_label`` names the date of the watch the page is narrowed to (« PHP 8.2 s’arrête le 31 décembre
+    2026 »), None when the page was not asked for a date or when the date concerns no site any more.
+    """
 
     counts: SiteCounts
     summary_line: str | None = None
     writing_queue_label: str | None = None
+    watch_date_label: str | None = None
     tab_counts: dict[str, int]
     trades: list[TradeOption]
     matching_count: int

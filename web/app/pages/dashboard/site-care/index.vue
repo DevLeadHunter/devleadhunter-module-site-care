@@ -97,8 +97,26 @@
           </div>
         </div>
 
-        <div class="flex flex-wrap gap-3">
-          <div class="relative min-w-0 flex-[999_1_16rem]">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="min-w-0 flex-[1_1_14rem] @2xl:w-64 @2xl:flex-none">
+            <UiSelectField
+              v-model="issueKindFilter"
+              :options="ISSUE_KIND_OPTIONS"
+              aria-label="Filtrer par type de souci"
+              class="h-10 min-h-10 rounded-full px-4 text-sm font-medium"
+            />
+          </div>
+          <button
+            v-if="siteList.watch_date_label !== null"
+            type="button"
+            class="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-full border border-[var(--app-line)] bg-[var(--app-surface)] pr-3 pl-4 text-sm font-medium text-[var(--app-ink)] transition-colors hover:border-[var(--app-ink-soft)] pointer-coarse:min-h-11"
+            :aria-label="`Retirer le filtre ${siteList.watch_date_label}`"
+            @click="clearWatchDate"
+          >
+            <span class="truncate">{{ siteList.watch_date_label }}</span>
+            <UIcon name="i-lucide-x" class="h-3.5 w-3.5 shrink-0 text-[var(--app-ink-soft)]" aria-hidden="true" />
+          </button>
+          <div class="relative min-w-0 flex-[1_1_16rem] @2xl:ml-auto @2xl:w-80 @2xl:flex-none">
             <UIcon
               name="i-lucide-search"
               class="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-[var(--app-ink-soft)]"
@@ -110,14 +128,6 @@
               placeholder="Nom, ville, adresse du site"
               aria-label="Rechercher un prospect"
               class="app-input h-10 min-h-10 rounded-full pr-4 pl-11 text-sm pointer-coarse:min-h-11"
-            />
-          </div>
-          <div class="min-w-0 flex-[1_1_14rem] @2xl:max-w-72">
-            <UiSelectField
-              v-model="issueKindFilter"
-              :options="ISSUE_KIND_OPTIONS"
-              aria-label="Filtrer par type de souci"
-              class="h-10 min-h-10 rounded-full px-4 text-sm font-medium"
             />
           </div>
         </div>
@@ -185,6 +195,7 @@ import {
   SITE_CARE_SEARCH_PATH,
   SITE_CARE_SITE_LIST_MAXIMUM_LIMIT,
   SITE_CARE_SITES_PATH,
+  SITE_CARE_WATCH_DATE_QUERY_NAME,
   SITE_CARE_WRITING_QUEUE_QUERY,
 } from '../../../constants/siteCareModule'
 import { SiteCareService } from '../../../services/siteCareService'
@@ -223,6 +234,7 @@ const isLoadingSites: Ref<boolean> = ref(true)
 const isLoadingMoreSites: Ref<boolean> = ref(false)
 const activeTab: Ref<SiteCareSiteTab> = ref(parseSiteTab(firstQueryValue(route.query.tab)) ?? DEFAULT_TAB)
 const issueKindFilter: Ref<string> = ref(parseIssueKind(firstQueryValue(route.query.kind)) ?? ALL_KINDS_VALUE)
+const watchDateKey: Ref<string | null> = ref(firstQueryValue(route.query[SITE_CARE_WATCH_DATE_QUERY_NAME]))
 const searchText: Ref<string> = ref('')
 const appliedSearchText: Ref<string> = ref('')
 const currentSearch: Ref<SiteCareSearch | null> = ref(null)
@@ -329,18 +341,28 @@ function siteListQuery(limit: number, offset: number): SiteCareSiteListQuery {
     trade: null,
     kind: parseIssueKind(issueKindFilter.value),
     q: appliedSearchText.value === '' ? null : appliedSearchText.value,
+    watch_date: watchDateKey.value,
     limit,
     offset,
   }
 }
 
 /**
- * Show an answer of the API: its counts and its rows replace the ones on screen.
+ * Show an answer of the API: its counts and its rows replace the ones on screen. A date of the watch that concerns
+ * no site any more is dropped from the filters, so the address stops asking for it.
  * @param response - The answer to show.
  */
 function showSiteList(response: SiteCareSiteListResponse): void {
   siteList.value = response
   sites.value = response.sites
+  if (response.watch_date_label === null && watchDateKey.value !== null) {
+    watchDateKey.value = null
+  }
+}
+
+/** Stop narrowing the list to the sites of a date of the watch. */
+function clearWatchDate(): void {
+  watchDateKey.value = null
 }
 
 /**
@@ -432,7 +454,7 @@ function selectTab(tab: SiteCareSiteTab): void {
   activeTab.value = tab
 }
 
-/** Keep the tab and the type of issue in the address, so coming back from a site lands on the same list. */
+/** Keep the tab, the type of issue and the date of the watch in the address, so coming back from a site lands on the same list. */
 function writeFiltersInAddress(): void {
   const query: LocationQueryRaw = {}
   if (activeTab.value !== DEFAULT_TAB) {
@@ -441,6 +463,9 @@ function writeFiltersInAddress(): void {
   const issueKind: SiteCareIssueKind | null = parseIssueKind(issueKindFilter.value)
   if (issueKind !== null) {
     query.kind = issueKind
+  }
+  if (watchDateKey.value !== null) {
+    query[SITE_CARE_WATCH_DATE_QUERY_NAME] = watchDateKey.value
   }
   router.replace({ query })
 }
@@ -534,7 +559,7 @@ watch(
 )
 
 watch(
-  (): string => [activeTab.value, issueKindFilter.value, appliedSearchText.value].join('\n'),
+  (): string => [activeTab.value, issueKindFilter.value, appliedSearchText.value, watchDateKey.value ?? ''].join('\n'),
   (): void => {
     writeFiltersInAddress()
     loadSites()

@@ -81,7 +81,9 @@ _EMAIL_STATUS_LABELS: dict[str, str] = {
 class SiteViews:
     """Turns sites into the list's lines and the sheet."""
 
-    def list_response(self, db: Session, listing: SiteListing, settings: OwnerSettings) -> SiteListResponse:
+    def list_response(
+        self, db: Session, listing: SiteListing, settings: OwnerSettings, *, watch_date_label: str | None = None
+    ) -> SiteListResponse:
         """
         A page of the list as the dashboard shows it.
 
@@ -89,6 +91,7 @@ class SiteViews:
             db: Active database session.
             listing: The page and the counts.
             settings: The owner's settings.
+            watch_date_label: The date of the watch the page is narrowed to, None when it is not.
 
         Returns:
             The response of ``GET /site-care/sites``.
@@ -104,6 +107,7 @@ class SiteViews:
             ),
             summary_line=self._summary_line(listing),
             writing_queue_label=self._writing_queue_label(listing),
+            watch_date_label=watch_date_label,
             tab_counts={tab.value: count for tab, count in listing.tab_counts.items()},
             trades=[TradeOption(key=key, label=TradeCatalog.resolve(key).label) for key in listing.trades],
             matching_count=listing.matching_count,
@@ -185,6 +189,35 @@ class SiteViews:
             ),
         )
 
+    def states_of(self, db: Session, sites: list[SiteCareSite]) -> dict[int, SiteState]:
+        """
+        Where the owner stands with each of several sites, read in three queries for all of them.
+
+        Args:
+            db: Active database session.
+            sites: The sites.
+
+        Returns:
+            The state of each site, by site id.
+        """
+        replied_site_ids, blocked_site_ids = self._contact_marks(db, sites)
+        cared_site_ids: set[int] = care_plan_service.active_site_ids(db, [site.id for site in sites])
+        return {
+            site.id: self._state(
+                site,
+                site_service.tab_of(site),
+                has_replied=site.id in replied_site_ids,
+                is_blocked=site.id in blocked_site_ids,
+                is_under_care=site.id in cared_site_ids,
+            )
+            for site in sites
+        }
+
+    @staticmethod
+    def trade_label_of(site: SiteCareSite) -> str:
+        """The trade a site was searched for, in words; empty when unknown."""
+        return TradeCatalog.resolve(site.trade).label if site.trade else ""
+
     @staticmethod
     def _summary_line(listing: SiteListing) -> str | None:
         """« 28 sites regardés de l’extérieur. 11 méritent un message, dont 1 site piraté. », None for an empty list."""
@@ -233,7 +266,7 @@ class SiteViews:
         return SiteListItem(
             id=site.id,
             business_name=site.business_name,
-            trade_label=TradeCatalog.resolve(site.trade).label if site.trade else "",
+            trade_label=self.trade_label_of(site),
             city=site.city,
             country=site.country,
             domain=site.host,

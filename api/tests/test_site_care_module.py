@@ -517,6 +517,71 @@ class TestCareAndWatch:
         assert (deadline["site_count"], deadline["action_label"]) == (2, "Voir ces 2 prospects")
         assert deadline["target"] == {"site_id": None, "tab": "all", "kind": "late"}
 
+    def test_the_watch_shows_each_site_that_changed_and_narrows_the_list_to_a_date(
+        self,
+        client: TestClient,
+        auth_headers: dict[str, str],
+        db: Session,
+        owner: User,
+        core_search: ProspectSearch,
+        readings: dict[str, SiteReading],
+    ) -> None:
+        read_today: datetime = datetime.utcnow().replace(microsecond=0)
+        _candidate(db, owner, core_search, "Bellanger Électricité", "bellanger-electricite.test")
+        _candidate(db, owner, core_search, "Garage Jacquet", "garage-jacquet.test")
+        _candidate(db, owner, core_search, "Auto Daniel", "auto-daniel.test")
+        _candidate(db, owner, core_search, "Jardins Guillot", "jardins-guillot.test")
+        readings["bellanger-electricite.test"] = reading_of(
+            "bellanger-electricite.test",
+            read_at=read_today,
+            gambling_links=["bahis.example"],
+            has_hidden_gambling_link=True,
+        )
+        readings["garage-jacquet.test"] = reading_of("garage-jacquet.test", read_at=read_today, powered_by="PHP/8.2.20")
+        readings["auto-daniel.test"] = reading_of(
+            "auto-daniel.test", read_at=read_today, powered_by="PHP/8.2.12", emails=[]
+        )
+        readings["jardins-guillot.test"] = reading_of("jardins-guillot.test", read_at=read_today)
+        _run_search(client, auth_headers, trades=[], country="FR", cities=[], count=10)
+
+        watch = client.get("/api/v1/site-care/watch", headers=auth_headers).json()
+        narrowed = client.get(f"{_SITES}?tab=all&watch_date=php-8.2", headers=auth_headers).json()
+        date_gone_by = client.get(f"{_SITES}?tab=all&watch_date=php-9.9", headers=auth_headers).json()
+
+        assert watch["summary_line"].startswith(
+            "4 sites relus ces sept derniers jours. 1 nouveau souci. Prochaine date dans "
+        )
+        assert [
+            (card["business_name"], card["kind_label"], card["sentence"], card["seen_label"], card["state"]["label"])
+            for card in watch["new_issues"]
+        ] == [
+            (
+                "Bellanger Électricité",
+                "Site piraté",
+                "Des liens cachés vers des casinos sur la page d’accueil",
+                "Vu aujourd’hui",
+                "À écrire",
+            )
+        ]
+        assert watch["gone_sites"] == []
+        date_card = watch["upcoming_dates"][0]
+        assert (date_card["key"], date_card["title"], date_card["site_id"]) == (
+            "php-8.2",
+            "PHP 8.2 s’arrête le 31 décembre 2026",
+            None,
+        )
+        assert (date_card["sites_label"], date_card["action_label"]) == (
+            "2 sites, dont 1 avec une adresse email",
+            "Voir ces 2 prospects",
+        )
+        assert date_card["detail"] == "Après cette date, ces sites ne reçoivent plus de correctifs de sécurité."
+        assert (narrowed["watch_date_label"], narrowed["matching_count"]) == (
+            "PHP 8.2 s’arrête le 31 décembre 2026",
+            2,
+        )
+        assert sorted(site["business_name"] for site in narrowed["sites"]) == ["Auto Daniel", "Garage Jacquet"]
+        assert (date_gone_by["watch_date_label"], date_gone_by["matching_count"]) == (None, 4)
+
     def test_an_address_that_shows_gambling_openly_waits_for_a_look_by_hand(
         self,
         client: TestClient,
@@ -609,3 +674,10 @@ class TestCareAndWatch:
         assert (site.status, kinds) == ("unreachable", ["unreachable"])
         sheet = client.get(f"{_SITES}/{site.id}", headers=auth_headers).json()
         assert sheet["tab"] == "review" and sheet["unread_text"].startswith("L’adresse du site ne mène plus nulle part")
+        watch = client.get("/api/v1/site-care/watch", headers=auth_headers).json()
+        assert watch["summary_line"] == "1 site relu ces sept derniers jours. 1 site disparu."
+        assert [
+            (card["site_id"], card["kind_label"], card["sentence"], card["seen_label"], card["state"]["label"])
+            for card in watch["gone_sites"]
+        ] == [(site.id, "Site disparu", "Son adresse ne mène plus nulle part", "Vu aujourd’hui", "À revoir")]
+        assert watch["new_issues"] == []

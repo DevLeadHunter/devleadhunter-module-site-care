@@ -95,6 +95,7 @@ class SiteService:
         text: str | None,
         limit: int,
         offset: int,
+        site_ids: list[int] | None = None,
     ) -> SiteListing:
         """
         A page of the owner's sites.
@@ -108,6 +109,7 @@ class SiteService:
             text: Words of a name, a city or an address to look for.
             limit: How many sites at most.
             offset: How many to skip.
+            site_ids: The only sites to keep (those a date of the watch concerns), None for every site.
 
         Returns:
             The counts of the whole list and the page asked for, the most pressing sites first.
@@ -140,6 +142,8 @@ class SiteService:
             matching = and_(matching, SiteCareSite.kinds_filter.like(f"%,{kind},%"))
         if text and text.strip():
             matching = and_(matching, SiteCareSite.search_text.like(f"%{self.folded(text)}%"))
+        if site_ids is not None:
+            matching = and_(matching, SiteCareSite.id.in_(site_ids))
         listing.matching_count = self._count(db, matching)
         listing.sites = list(
             db.execute(

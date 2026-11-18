@@ -228,7 +228,7 @@ type SiteDetail = {
 
 | Méthode et chemin | Corps ou paramètres | Réponse |
 | --- | --- | --- |
-| `GET /site-care/sites` | `tab` (défaut `to_write` ; `all` = tous les onglets), `trade` (clé de métier), `kind`, `q`, `limit` (défaut 100, max 500), `offset` | `SiteListResponse` |
+| `GET /site-care/sites` | `tab` (défaut `to_write` ; `all` = tous les onglets), `trade` (clé de métier), `kind`, `q`, `watch_date` (la clé d'une date de la veille : ne garde que ses sites ; une date qui ne concerne plus aucun site est ignorée), `limit` (défaut 100, max 500), `offset` | `SiteListResponse` |
 | `GET /site-care/sites/{id}` | | `SiteDetail` |
 | `PATCH /site-care/sites/{id}` | `{ "email": "contact@exemple.fr" }` (une adresse vide retire celle du site) | `SiteDetail` |
 | `POST /site-care/sites/{id}/find-email` | | `SiteDetail` (son `email` est rempli quand une adresse est trouvée) |
@@ -241,6 +241,7 @@ type SiteListResponse = {
   counts: { total: number; with_email: number; to_fix: number; written: number } // tous les sites de l'utilisateur
   summary_line: string | null // la phrase sous le titre, null sans aucun site
   writing_queue_label: string | null // « Traiter les 11 sites », null sans site à écrire
+  watch_date_label: string | null // la date de la veille qui restreint la liste, null sans `watch_date` retenu
   tab_counts: Record<SiteTab | 'all', number> // tous les sites de l'utilisateur
   trades: { key: string; label: string }[] // les métiers présents, pour le filtre
   matching_count: number // l'onglet et les filtres demandés
@@ -253,6 +254,7 @@ type SiteListResponse = {
   "counts": { "total": 136, "with_email": 67, "to_fix": 32, "written": 9 },
   "summary_line": "136 sites regardés de l’extérieur. 11 méritent un message.",
   "writing_queue_label": "Traiter les 11 sites",
+  "watch_date_label": null,
   "tab_counts": { "to_write": 11, "written": 9, "no_email": 12, "nothing": 89, "review": 15, "all": 136 },
   "trades": [ { "key": "paysagiste", "label": "Paysagistes" } ],
   "matching_count": 11,
@@ -365,7 +367,49 @@ type Search = {
 
 `GET /site-care/watch` → `WatchResponse`
 
+Trois colonnes : les soucis apparus depuis la lecture d'avant (un site par carte), les dates après lesquelles des
+sites auront un souci (une date par carte), les sites qui ne répondent plus. Un changement n'est montré que sept
+jours, et seulement tant qu'il tient encore (site toujours piraté, toujours muet, point toujours à corriger).
+
 ```ts
+type WatchSiteChange = {
+  key: string
+  site_id: number // la carte ouvre la page de ce site
+  kind: LeadKind // choisit l'icône de l'étiquette
+  kind_label: string // « Site piraté », « Site disparu »
+  tone: Tone
+  tech: string | null // « PHP 7.4 »
+  sentence: string // ce qui a été vu, en une phrase courte
+  business_name: string
+  trade_label: string // vide quand le métier est inconnu
+  city: string | null
+  seen_label: string // « Vu il y a 3 jours »
+  state: SiteState // où en est l'utilisateur avec ce site : « À écrire », « Sans email », « Écrit le 9 nov. »
+}
+
+type WatchDate = {
+  key: string // « php-8.2 », « certificates » : la valeur de `watch_date` sur `GET /site-care/sites`
+  kind: LeadKind
+  kind_label: string
+  tone: Tone
+  title: string // « PHP 8.2 s’arrête le 31 décembre 2026 »
+  detail: string // ce que la date change pour ses sites, sans leur nombre
+  countdown_label: string // « Dans 46 jours »
+  sites_label: string // « 339 sites, dont 212 avec une adresse email » ; le nom de l'entreprise pour un seul site
+  action_label: string // « Voir ces 339 prospects »
+  site_id: number | null // le seul site concerné : la carte ouvre sa page ; sinon « Mes prospects » sur la date
+}
+
+type WatchResponse = {
+  summary_line: string | null // la phrase sous le titre, null sans aucun site
+  new_issues: WatchSiteChange[] // les sites piratés d'abord
+  upcoming_dates: WatchDate[] // la plus proche d'abord
+  gone_sites: WatchSiteChange[]
+  today: WatchEvent[] // les mêmes changements en lignes, lus par les applications d'avant la v1.6.0
+  deadlines: WatchEvent[] // les mêmes dates en lignes, lues par les applications d'avant la v1.6.0
+}
+
+// Ancienne forme, gardée pour les applications PC qui n'ont pas encore la v1.6.0 ; à retirer ensuite.
 type WatchEvent = {
   key: string
   kind: LeadKind
@@ -381,22 +425,28 @@ type WatchEvent = {
     kind: IssueKind | null // et ce type de souci
   }
 }
-
-type WatchResponse = {
-  today: WatchEvent[]
-  deadlines: WatchEvent[]
-}
 ```
 
 ```json
 // WatchResponse
 {
+  "summary_line": "2865 sites relus ces sept derniers jours. 5 nouveaux soucis, 3 sites disparus. Prochaine date dans 7 jours.",
+  "new_issues": [ WatchSiteChange ],
+  "upcoming_dates": [ WatchDate ],
+  "gone_sites": [ WatchSiteChange ],
   "today": [ WatchEvent ],
   "deadlines": [ WatchEvent ]
 }
-// WatchEvent
-{ "key": "hacked-12", "kind": "hack", "tone": "red", "title": "Un site piraté", "detail": "Bellanger Électricité, à Mulhouse : des liens cachés vers des casinos sur la page d’accueil.",
-  "when_label": "Vu aujourd’hui", "site_count": 1, "action_label": "Voir ce prospect", "target": { "site_id": 12, "tab": null, "kind": null } }
+// WatchSiteChange
+{ "key": "hacked-12", "site_id": 12, "kind": "hack", "kind_label": "Site piraté", "tone": "red", "tech": null,
+  "sentence": "Des liens cachés vers des casinos sur la page d’accueil", "business_name": "Bellanger Électricité",
+  "trade_label": "Électricien", "city": "Mulhouse", "seen_label": "Vu aujourd’hui",
+  "state": { "key": "to_write", "label": "À écrire", "tone": "ink" } }
+// WatchDate
+{ "key": "php-8.2", "kind": "late", "kind_label": "Mise à jour en retard", "tone": "amber",
+  "title": "PHP 8.2 s’arrête le 31 décembre 2026", "detail": "Après cette date, ces sites ne reçoivent plus de correctifs de sécurité.",
+  "countdown_label": "Dans 46 jours", "sites_label": "339 sites, dont 212 avec une adresse email",
+  "action_label": "Voir ces 339 prospects", "site_id": null }
 ```
 
 ### Suivis

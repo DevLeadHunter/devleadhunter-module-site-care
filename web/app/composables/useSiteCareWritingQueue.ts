@@ -28,6 +28,7 @@ export function useSiteCareWritingQueue(): UseSiteCareWritingQueueReturn {
       trade: null,
       kind: null,
       q: null,
+      watch_date: null,
       limit: SITE_CARE_SITE_LIST_MAXIMUM_LIMIT,
       offset: 0,
     })

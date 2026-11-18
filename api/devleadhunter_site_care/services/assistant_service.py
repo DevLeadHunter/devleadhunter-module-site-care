@@ -553,8 +553,10 @@ class AssistantService:
         Returns:
             The lines of the watch page, the most pressing as the highlight.
         """
-        changes: list[WatchLine] = watch_service.recent_changes(db, user_id, now)
-        deadlines: list[WatchLine] = watch_service.dates_coming_up(db, user_id, now)
+        changes: list[WatchLine] = watch_service.recent_changes(
+            watch_service.changes_that_still_hold(db, user_id, now), now
+        )
+        deadlines: list[WatchLine] = [watch_date.line for watch_date in watch_service.upcoming_dates(db, user_id, now)]
         if not changes and not deadlines:
             return AssistantToolResult(
                 facts={"changements": [], "echeances": []}, sentence="Rien de nouveau dans la veille."

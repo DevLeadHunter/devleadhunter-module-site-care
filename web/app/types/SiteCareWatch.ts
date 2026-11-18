@@ -1,25 +1,39 @@
-import type { SiteCareIssueKind, SiteCareLeadKind, SiteCareSiteTab, SiteCareTone } from './SiteCareSite'
+import type { SiteCareLeadKind, SiteCareSiteState, SiteCareTone } from './SiteCareSite'
 
-/** Where an event leads in « Mes prospects »: the sheet of one site, else the list on a tab and a type of issue. */
-export type SiteCareWatchTarget = {
-  site_id: number | null
-  tab: SiteCareSiteTab | null
-  kind: SiteCareIssueKind | null
+/** One site of the watch: what the last readings found on it, and where the owner stands with it. */
+export type SiteCareWatchSiteChange = {
+  key: string
+  site_id: number
+  kind: SiteCareLeadKind
+  kind_label: string
+  tone: SiteCareTone
+  tech: string | null
+  sentence: string
+  business_name: string
+  trade_label: string
+  city: string | null
+  seen_label: string
+  state: SiteCareSiteState
 }
 
-export type SiteCareWatchEvent = {
+/** One date after which some sites will have a problem; `site_id` is set when it concerns a single site. */
+export type SiteCareWatchDate = {
   key: string
   kind: SiteCareLeadKind
+  kind_label: string
   tone: SiteCareTone
   title: string
   detail: string
-  when_label: string
-  site_count: number
+  countdown_label: string
+  sites_label: string
   action_label: string
-  target: SiteCareWatchTarget
+  site_id: number | null
 }
 
+/** Answer of `GET /site-care/watch`; `summary_line` is null while the owner follows no site. */
 export type SiteCareWatchResponse = {
-  today: SiteCareWatchEvent[]
-  deadlines: SiteCareWatchEvent[]
+  summary_line: string | null
+  new_issues: SiteCareWatchSiteChange[]
+  upcoming_dates: SiteCareWatchDate[]
+  gone_sites: SiteCareWatchSiteChange[]
 }

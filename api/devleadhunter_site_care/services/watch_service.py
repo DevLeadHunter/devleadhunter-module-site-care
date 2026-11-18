@@ -13,13 +13,13 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import ClassVar
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.clock import naive_utc_now
 from core.database import SessionLocal
 
-from devleadhunter_site_care.catalog import IssueKind, PointKey, PointState, SiteStatus
+from devleadhunter_site_care.catalog import KIND_LABELS, IssueKind, PointKey, PointState, SiteStatus
 from devleadhunter_site_care.models.site import SiteCareSite
 from devleadhunter_site_care.models.watch_event import SiteCareWatchEvent
 from devleadhunter_site_care.services.owner_settings_service import owner_settings_service
@@ -29,6 +29,9 @@ from devleadhunter_site_care.services.site_service import site_service
 from devleadhunter_site_care.services.watch_notifier import WatchNotification, watch_notifier
 
 logger = logging.getLogger(__name__)
+
+# A change a check noted, with the site it was noted on.
+NotedChange = tuple[SiteCareWatchEvent, SiteCareSite]
 
 
 @dataclass
@@ -42,6 +45,7 @@ class WatchLine:
         tone: ``red``, ``amber`` or ``neutral``.
         title: What happened.
         detail: The explanation.
+        consequence: What the date changes for its sites, without their count (a date's line only).
         when_label: When it was seen, or how far the date is.
         site_count: How many sites the line is about.
         action_label: The wording of its button.
@@ -61,6 +65,49 @@ class WatchLine:
     site_id: int | None = None
     tab: str | None = None
     kind_filter: str | None = None
+    consequence: str = ""
+
+
+@dataclass(frozen=True)
+class WatchSiteChange:
+    """
+    What the last readings found on one site that the reading before had not.
+
+    Attributes:
+        key: A stable identifier of the change.
+        site: The site.
+        kind: The kind of issue, which picks the icon and the colour of the tag.
+        kind_label: The word of the tag (« Site piraté », « Site disparu »).
+        sentence: What was seen, in one short sentence.
+        tech: The technology to name next to the tag (« PHP 7.4 »), empty when there is none.
+        seen_at: When the reading saw it.
+    """
+
+    key: str
+    site: SiteCareSite
+    kind: IssueKind
+    kind_label: str
+    sentence: str
+    tech: str
+    seen_at: datetime
+
+
+@dataclass(frozen=True)
+class WatchDate:
+    """
+    A date after which some sites will have a problem.
+
+    Attributes:
+        key: A stable identifier of the date (« php-8.2 », « certificates »), which « Mes prospects » filters on.
+        days_left: How many days are left before the nearest of its sites is concerned.
+        line: Its wording.
+        sites: The sites concerned.
+    """
+
+    key: str
+    days_left: int
+    line: WatchLine
+    sites: list[SiteCareSite]
 
 
 class WatchService:
@@ -70,45 +117,32 @@ class WatchService:
     _RECHECK_AFTER_DAYS: ClassVar[int] = 7
     _SITES_PER_PASS: ClassVar[int] = 3
     _SECONDS_BETWEEN_PASSES: ClassVar[float] = 300.0
+    _CERTIFICATES_KEY: ClassVar[str] = "certificates"
+    _HACKED_SENTENCE: ClassVar[str] = "Des liens cachés vers des casinos sur la page d’accueil"
+    _GONE_LABEL: ClassVar[str] = "Site disparu"
+    _GONE_SENTENCE: ClassVar[str] = "Son adresse ne mène plus nulle part"
 
     def __init__(self) -> None:
         self._next_pass_after: float = 0.0
 
-    def recent_changes(self, db: Session, user_id: int, now: datetime) -> list[WatchLine]:
+    def recent_changes(self, noted_changes: list[NotedChange], now: datetime) -> list[WatchLine]:
         """
-        What the checks of the last days found that was not there before.
+        The changes of the last days as lines, the way the applications before v1.6.0 list them.
 
         Args:
-            db: Active database session.
-            user_id: The owner.
+            noted_changes: The changes that still hold, from :meth:`changes_that_still_hold`.
             now: The current instant (naive UTC).
 
         Returns:
             Hacked sites one by one, then the sites that stopped answering together, then the points that got worse.
         """
-        rows = db.execute(
-            select(SiteCareWatchEvent, SiteCareSite)
-            .join(SiteCareSite, SiteCareSite.id == SiteCareWatchEvent.site_id)
-            .where(
-                SiteCareWatchEvent.user_id == user_id,
-                SiteCareWatchEvent.created_at >= now - timedelta(days=self._RECENT_DAYS),
-                SiteCareSite.archived_at.is_(None),
-            )
-            .order_by(SiteCareWatchEvent.created_at.desc())
-        ).all()
         lines: list[WatchLine] = []
-        gone: list[tuple[SiteCareWatchEvent, SiteCareSite]] = []
-        seen: set[tuple[str, int]] = set()
-        for event, site in rows:
-            if (event.kind, site.id) in seen:
-                continue
-            seen.add((event.kind, site.id))
+        gone: list[NotedChange] = []
+        for event, site in noted_changes:
             if event.kind == "unreachable":
-                if site.status == SiteStatus.UNREACHABLE.value:
-                    gone.append((event, site))
+                gone.append((event, site))
             elif event.kind == "hacked":
-                if self._is_still_hacked(site):
-                    lines.append(self._hacked_line(event, site, now))
+                lines.append(self._hacked_line(event, site, now))
             else:
                 worse: WatchLine | None = self._worse_line(event, site, now)
                 if worse is not None:
@@ -117,9 +151,74 @@ class WatchService:
             lines.append(self._gone_line(gone, now))
         return sorted(lines, key=lambda line: (line.tone != "red", line.kind != IssueKind.HACK))
 
-    def dates_coming_up(self, db: Session, user_id: int, now: datetime) -> list[WatchLine]:
+    def new_issues(self, noted_changes: list[NotedChange]) -> list[WatchSiteChange]:
         """
-        The dates after which some sites will have a problem: a PHP branch's end, certificates that expire.
+        The sites on which the last readings found an issue the reading before had not: a hack, a point to fix.
+
+        Args:
+            noted_changes: The changes that still hold, from :meth:`changes_that_still_hold`.
+
+        Returns:
+            One change per site and point, the hacked sites first, then the latest seen first.
+        """
+        changes: list[WatchSiteChange] = []
+        for event, site in noted_changes:
+            if event.kind == "hacked":
+                changes.append(
+                    WatchSiteChange(
+                        key=f"hacked-{site.id}",
+                        site=site,
+                        kind=IssueKind.HACK,
+                        kind_label=KIND_LABELS[IssueKind.HACK],
+                        sentence=self._HACKED_SENTENCE,
+                        tech="",
+                        seen_at=event.created_at,
+                    )
+                )
+            elif event.kind == "worse":
+                point: SitePoint | None = self._point_to_fix(site, event.point_key)
+                if point is not None:
+                    changes.append(
+                        WatchSiteChange(
+                            key=f"worse-{site.id}-{point.key.value}",
+                            site=site,
+                            kind=point.kind or IssueKind.REVIEW,
+                            kind_label=KIND_LABELS[point.kind or IssueKind.REVIEW],
+                            sentence=point.sentence or point.fact,
+                            tech=point.tech,
+                            seen_at=event.created_at,
+                        )
+                    )
+        return sorted(changes, key=lambda change: change.kind != IssueKind.HACK)
+
+    def gone_sites(self, noted_changes: list[NotedChange]) -> list[WatchSiteChange]:
+        """
+        The sites that stopped answering since the reading before, and still do not answer.
+
+        Args:
+            noted_changes: The changes that still hold, from :meth:`changes_that_still_hold`.
+
+        Returns:
+            One change per site, the latest seen first.
+        """
+        return [
+            WatchSiteChange(
+                key=f"gone-{site.id}",
+                site=site,
+                kind=IssueKind.REVIEW,
+                kind_label=self._GONE_LABEL,
+                sentence=self._GONE_SENTENCE,
+                tech="",
+                seen_at=event.created_at,
+            )
+            for event, site in noted_changes
+            if event.kind == "unreachable"
+        ]
+
+    def upcoming_dates(self, db: Session, user_id: int, now: datetime) -> list[WatchDate]:
+        """
+        The dates after which some sites will have a problem (a PHP branch's end, certificates that expire), each
+        with the sites it concerns.
 
         Args:
             db: Active database session.
@@ -127,7 +226,7 @@ class WatchService:
             now: The current instant (naive UTC).
 
         Returns:
-            One line per date, the nearest first.
+            One date per PHP branch that ends and one for the certificates that expire, the nearest first.
         """
         sites = db.execute(
             select(SiteCareSite).where(
@@ -147,16 +246,66 @@ class WatchService:
                     php_sites[(point.data["version"], point.data["end_iso"])].append(site)
                 elif point.key == PointKey.HTTPS and point.data.get("variant") == "expiring":
                     certificate_sites.append((site, int(point.data.get("days", 0))))
-        dated: list[tuple[int, WatchLine]] = []
+        dates: list[WatchDate] = []
         today: date = now.date()
         for (version, end_iso), concerned in php_sites.items():
             end: date = date.fromisoformat(end_iso)
             days_left: int = (end - today).days
-            dated.append((days_left, self._php_line(version, end, days_left, concerned)))
+            dates.append(
+                WatchDate(
+                    key=f"php-{version}",
+                    days_left=days_left,
+                    line=self._php_line(version, end, days_left, concerned),
+                    sites=concerned,
+                )
+            )
         if certificate_sites:
-            days: list[int] = [days_left for _, days_left in certificate_sites]
-            dated.append((min(days), self._certificate_line(certificate_sites)))
-        return [line for _, line in sorted(dated, key=lambda entry: entry[0])]
+            dates.append(
+                WatchDate(
+                    key=self._CERTIFICATES_KEY,
+                    days_left=min(days_left for _, days_left in certificate_sites),
+                    line=self._certificate_line(certificate_sites),
+                    sites=[site for site, _ in certificate_sites],
+                )
+            )
+        return sorted(dates, key=lambda watch_date: watch_date.days_left)
+
+    def upcoming_date(self, db: Session, user_id: int, key: str, now: datetime) -> WatchDate | None:
+        """
+        One of the dates coming up, by its key.
+
+        Args:
+            db: Active database session.
+            user_id: The owner.
+            key: The date's key, as the watch page links it.
+            now: The current instant (naive UTC).
+
+        Returns:
+            The date, or None when no site of the owner is concerned by it any more.
+        """
+        return next((each for each in self.upcoming_dates(db, user_id, now) if each.key == key), None)
+
+    def followed_site_count(self, db: Session, user_id: int, now: datetime, *, reread_only: bool) -> int:
+        """
+        How many sites of the owner the watch follows, or how many of them it read again over the last days.
+
+        Args:
+            db: Active database session.
+            user_id: The owner.
+            now: The current instant (naive UTC).
+            reread_only: Count only the sites whose last check is at most seven days old.
+
+        Returns:
+            The count.
+        """
+        followed = (
+            select(func.count())
+            .select_from(SiteCareSite)
+            .where(SiteCareSite.user_id == user_id, SiteCareSite.archived_at.is_(None))
+        )
+        if reread_only:
+            followed = followed.where(SiteCareSite.checked_at >= now - timedelta(days=self._RECHECK_AFTER_DAYS))
+        return int(db.execute(followed).scalar() or 0)
 
     async def recheck_due_sites(self) -> None:
         """Read again a few sites whose check is old, at most once every few minutes, and tell what that found."""
@@ -194,8 +343,55 @@ class WatchService:
             )
         await watch_notifier.send(pass_notifications)
 
+    def changes_that_still_hold(self, db: Session, user_id: int, now: datetime) -> list[NotedChange]:
+        """
+        The changes of the last days that still hold: a site still hacked, still silent, a point still to fix.
+
+        Args:
+            db: Active database session.
+            user_id: The owner.
+            now: The current instant (naive UTC).
+
+        Returns:
+            Each change once per site and point, the latest first.
+        """
+        rows = db.execute(
+            select(SiteCareWatchEvent, SiteCareSite)
+            .join(SiteCareSite, SiteCareSite.id == SiteCareWatchEvent.site_id)
+            .where(
+                SiteCareWatchEvent.user_id == user_id,
+                SiteCareWatchEvent.created_at >= now - timedelta(days=self._RECENT_DAYS),
+                SiteCareSite.archived_at.is_(None),
+            )
+            .order_by(SiteCareWatchEvent.created_at.desc())
+        ).all()
+        fresh: list[NotedChange] = []
+        seen: set[tuple[str, int, str | None]] = set()
+        for event, site in rows:
+            mark: tuple[str, int, str | None] = (event.kind, site.id, event.point_key)
+            if mark in seen:
+                continue
+            seen.add(mark)
+            if event.kind == "unreachable":
+                still_holds: bool = site.status == SiteStatus.UNREACHABLE.value
+            elif event.kind == "hacked":
+                still_holds = self._is_still_hacked(site)
+            else:
+                still_holds = self._point_to_fix(site, event.point_key) is not None
+            if still_holds:
+                fresh.append((event, site))
+        return fresh
+
     @staticmethod
-    def _seen_label(moment: datetime, now: datetime) -> str:
+    def _point_to_fix(site: SiteCareSite, point_key: str | None) -> SitePoint | None:
+        """A point of the site's last check, None when it is no longer to fix."""
+        stored: dict | None = next((point for point in site.points or [] if point["key"] == point_key), None)
+        if stored is None or stored["state"] != PointState.FIX.value:
+            return None
+        return SitePoint.from_json(stored)
+
+    @staticmethod
+    def seen_label(moment: datetime, now: datetime) -> str:
         """« Vu aujourd’hui », « Vu hier » or « Vu il y a 3 jours »."""
         days: int = (now.date() - moment.date()).days
         if days <= 0:
@@ -222,30 +418,29 @@ class WatchService:
             tone="red",
             title="Un site piraté",
             detail=f"{self._place(site)} : des liens cachés vers des casinos sur la page d’accueil.",
-            when_label=self._seen_label(event.created_at, now),
+            when_label=self.seen_label(event.created_at, now),
             site_count=1,
             action_label="Voir ce prospect",
             site_id=site.id,
         )
 
     def _worse_line(self, event: SiteCareWatchEvent, site: SiteCareSite, now: datetime) -> WatchLine | None:
-        stored: dict | None = next((point for point in site.points or [] if point["key"] == event.point_key), None)
-        if stored is None or stored["state"] != PointState.FIX.value:
+        point: SitePoint | None = self._point_to_fix(site, event.point_key)
+        if point is None:
             return None
-        point: SitePoint = SitePoint.from_json(stored)
         return WatchLine(
             key=f"worse-{site.id}-{point.key.value}",
             kind=point.kind or IssueKind.REVIEW,
             tone="red",
             title="Un nouveau point à corriger",
             detail=f"{self._place(site)} : {point.fact[:1].lower()}{point.fact[1:]}",
-            when_label=self._seen_label(event.created_at, now),
+            when_label=self.seen_label(event.created_at, now),
             site_count=1,
             action_label="Voir ce prospect",
             site_id=site.id,
         )
 
-    def _gone_line(self, gone: list[tuple[SiteCareWatchEvent, SiteCareSite]], now: datetime) -> WatchLine:
+    def _gone_line(self, gone: list[NotedChange], now: datetime) -> WatchLine:
         count: int = len(gone)
         latest: datetime = max(event.created_at for event, _ in gone)
         if count == 1:
@@ -256,7 +451,7 @@ class WatchService:
                 tone="neutral",
                 title="Un site ne répond plus",
                 detail=f"{self._place(site)} : son adresse ne mène plus nulle part. Cette entreprise n’a plus de site.",
-                when_label=self._seen_label(latest, now),
+                when_label=self.seen_label(latest, now),
                 site_count=1,
                 action_label="Voir ce prospect",
                 site_id=site.id,
@@ -267,7 +462,7 @@ class WatchService:
             tone="neutral",
             title=f"{count} sites ne répondent plus",
             detail="Leur adresse ne mène plus nulle part. Ces entreprises n’ont plus de site.",
-            when_label=self._seen_label(latest, now),
+            when_label=self.seen_label(latest, now),
             site_count=count,
             action_label=f"Voir ces {count} prospects",
             tab="review",
@@ -295,6 +490,11 @@ class WatchService:
             site_id=None if several else sites[0].id,
             tab="all" if several else None,
             kind_filter=IssueKind.LATE.value if several else None,
+            consequence=(
+                "Après cette date, ces sites ne reçoivent plus de correctifs de sécurité."
+                if several
+                else "Après cette date, son site ne reçoit plus de correctifs de sécurité."
+            ),
         )
 
     @staticmethod
@@ -304,7 +504,7 @@ class WatchService:
         several: bool = count > 1
         span: str = f"Dans {days[0]} à {days[-1]} jours" if days[0] != days[-1] else f"Dans {days[0]} jours"
         return WatchLine(
-            key="certificates",
+            key=WatchService._CERTIFICATES_KEY,
             kind=IssueKind.SECURITY,
             tone="amber",
             title=(
@@ -323,6 +523,13 @@ class WatchService:
             site_id=None if several else sites[0][0].id,
             tab="all" if several else None,
             kind_filter=IssueKind.SECURITY.value if several else None,
+            consequence=(
+                "Ils n’ont pas été renouvelés à temps. Le jour de l’expiration, le navigateur affichera un "
+                "avertissement à leurs visiteurs."
+                if several
+                else "Il n’a pas été renouvelé à temps. Le jour de l’expiration, le navigateur affichera un "
+                "avertissement à ses visiteurs."
+            ),
         )
 
 
