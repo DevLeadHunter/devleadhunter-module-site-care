@@ -50,8 +50,8 @@ class WatchViews:
         )
         return WatchResponse(
             summary_line=self._summary_line(
-                followed_count=watch_service.followed_site_count(db, user_id, now, reread_only=False),
-                reread_count=watch_service.followed_site_count(db, user_id, now, reread_only=True),
+                followed_count=watch_service.followed_site_count(db, user_id, now, is_reread_only=False),
+                reread_count=watch_service.followed_site_count(db, user_id, now, is_reread_only=True),
                 new_issue_count=len(new_issues),
                 gone_count=len(gone_sites),
                 upcoming_dates=upcoming_dates,

@@ -1,10 +1,10 @@
 import type { SiteCareTone } from './SiteCareSite'
 
-/** `emptyText` is shown in place of the cards while `count` is zero. */
+/** `emptyText` is shown in place of the cards while `cardCount` is zero. */
 export type SiteCareBoardColumnProps = {
   title: string
-  hint: string
-  count: number
+  description: string
+  cardCount: number
   tone: SiteCareTone
   emptyText: string
 }

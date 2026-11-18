@@ -20,7 +20,6 @@ export const SITE_CARE_SETTINGS_PATH: string = '/dashboard/settings/site-care'
 
 export const SITE_CARE_WRITING_QUEUE_QUERY: Record<string, string> = { queue: '1' }
 
-/** The address query of « Mes prospects » that narrows the list to the sites one date of the watch concerns. */
 export const SITE_CARE_WATCH_DATE_QUERY_NAME: string = 'date'
 
 export const SITE_CARE_SITE_LIST_MAXIMUM_LIMIT: number = 500

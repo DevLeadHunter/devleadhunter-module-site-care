@@ -129,8 +129,8 @@ export class SiteCareService {
   }
 
   /**
-   * Read the watch: what changed today on the prospects' sites and the dates coming up.
-   * @returns The events of today and the deadlines.
+   * Read the watch: what changed on the prospects' sites and the dates coming up.
+   * @returns The week's summary, the sites that changed and the dates coming up.
    */
   static getWatch(): Promise<SiteCareWatchResponse> {
     return ApiClient.get<SiteCareWatchResponse>(`${SITE_CARE_API_BASE}/watch`)

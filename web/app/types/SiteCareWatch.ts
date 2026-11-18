@@ -1,6 +1,5 @@
 import type { SiteCareLeadKind, SiteCareSiteState, SiteCareTone } from './SiteCareSite'
 
-/** One site of the watch: what the last readings found on it, and where the owner stands with it. */
 export type SiteCareWatchSiteChange = {
   key: string
   site_id: number

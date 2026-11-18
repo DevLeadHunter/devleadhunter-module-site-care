@@ -7,12 +7,12 @@
     <div class="px-1">
       <div class="flex items-baseline justify-between gap-2 font-semibold">
         <h2 :id="titleId" class="text-[15px]">{{ props.title }}</h2>
-        <span class="text-sm">{{ props.count }}</span>
+        <span class="text-sm">{{ props.cardCount }}</span>
       </div>
-      <p class="mt-0.5 text-[13px]">{{ props.hint }}</p>
+      <p class="mt-0.5 text-[13px]">{{ props.description }}</p>
     </div>
     <slot />
-    <p v-if="props.count === 0" class="px-1 py-3 text-sm">{{ props.emptyText }}</p>
+    <p v-if="props.cardCount === 0" class="px-1 py-3 text-sm">{{ props.emptyText }}</p>
   </section>
 </template>
 
@@ -29,11 +29,11 @@ const props: SiteCareBoardColumnProps = defineProps({
     type: String,
     required: true,
   },
-  hint: {
+  description: {
     type: String,
     required: true,
   },
-  count: {
+  cardCount: {
     type: Number,
     required: true,
   },

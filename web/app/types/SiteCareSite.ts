@@ -140,11 +140,7 @@ export type SiteCareTradeFilter = {
   label: string
 }
 
-/**
- * Answer of `GET /site-care/sites`: the counts cover every site, `matching_count` the tab and filters asked.
- * `watch_date_label` names the date of the watch the rows are narrowed to, null when they are not (no date asked, or
- * a date that concerns no site any more).
- */
+/** Answer of `GET /site-care/sites`: the counts cover every site, `matching_count` the tab and filters asked. */
 export type SiteCareSiteListResponse = {
   counts: SiteCareSiteCounts
   tab_counts: Record<SiteCareSiteTab, number>

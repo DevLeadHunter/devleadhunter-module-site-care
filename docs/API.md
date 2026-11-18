@@ -409,7 +409,7 @@ type WatchResponse = {
   deadlines: WatchEvent[] // les mêmes dates en lignes, lues par les applications d'avant la v1.6.0
 }
 
-// Ancienne forme, gardée pour les applications PC qui n'ont pas encore la v1.6.0 ; à retirer ensuite.
+// Ancienne forme, lue par les applications PC d'avant la v1.6.0.
 type WatchEvent = {
   key: string
   kind: LeadKind

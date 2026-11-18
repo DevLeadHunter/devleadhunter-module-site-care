@@ -34,9 +34,9 @@
     <div v-else class="grid grid-cols-1 items-start gap-4 @4xl:grid-cols-3">
       <SiteCareBoardColumn
         title="Nouveaux soucis"
-        hint="À écrire en premier : c’est récent."
+        description="À écrire en premier : c’est récent."
         tone="red"
-        :count="watchBoard.new_issues.length"
+        :card-count="watchBoard.new_issues.length"
         empty-text="Rien de nouveau cette semaine."
       >
         <SiteCareWatchSiteCard
@@ -48,9 +48,9 @@
 
       <SiteCareBoardColumn
         title="Dates qui approchent"
-        hint="Ces sites auront un souci après la date."
+        description="Ces sites auront un souci après la date."
         tone="amber"
-        :count="watchBoard.upcoming_dates.length"
+        :card-count="watchBoard.upcoming_dates.length"
         empty-text="Aucune date dans les semaines qui viennent."
       >
         <SiteCareWatchDateCard
@@ -62,9 +62,9 @@
 
       <SiteCareBoardColumn
         title="Sites disparus"
-        hint="Leur adresse ne répond plus."
+        description="Leur adresse ne répond plus."
         tone="neutral"
-        :count="watchBoard.gone_sites.length"
+        :card-count="watchBoard.gone_sites.length"
         empty-text="Aucun site n’a disparu cette semaine."
       >
         <SiteCareWatchSiteCard

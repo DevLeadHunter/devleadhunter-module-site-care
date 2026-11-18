@@ -348,8 +348,7 @@ function siteListQuery(limit: number, offset: number): SiteCareSiteListQuery {
 }
 
 /**
- * Show an answer of the API: its counts and its rows replace the ones on screen. A date of the watch that concerns
- * no site any more is dropped from the filters, so the address stops asking for it.
+ * Show an answer of the API, and drop the date of the watch once it concerns no site any more.
  * @param response - The answer to show.
  */
 function showSiteList(response: SiteCareSiteListResponse): void {

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from core.clock import naive_utc_now
 from core.database import SessionLocal
 
-from devleadhunter_site_care.catalog import KIND_LABELS, IssueKind, PointKey, PointState, SiteStatus
+from devleadhunter_site_care.catalog import KIND_LABELS, IssueKind, PointKey, PointState, SiteStatus, WatchEventKind
 from devleadhunter_site_care.models.site import SiteCareSite
 from devleadhunter_site_care.models.watch_event import SiteCareWatchEvent
 from devleadhunter_site_care.services.owner_settings_service import owner_settings_service
@@ -139,9 +139,9 @@ class WatchService:
         lines: list[WatchLine] = []
         gone: list[NotedChange] = []
         for event, site in noted_changes:
-            if event.kind == "unreachable":
+            if event.kind == WatchEventKind.UNREACHABLE.value:
                 gone.append((event, site))
-            elif event.kind == "hacked":
+            elif event.kind == WatchEventKind.HACKED.value:
                 lines.append(self._hacked_line(event, site, now))
             else:
                 worse: WatchLine | None = self._worse_line(event, site, now)
@@ -163,7 +163,7 @@ class WatchService:
         """
         changes: list[WatchSiteChange] = []
         for event, site in noted_changes:
-            if event.kind == "hacked":
+            if event.kind == WatchEventKind.HACKED.value:
                 changes.append(
                     WatchSiteChange(
                         key=f"hacked-{site.id}",
@@ -175,7 +175,7 @@ class WatchService:
                         seen_at=event.created_at,
                     )
                 )
-            elif event.kind == "worse":
+            elif event.kind == WatchEventKind.WORSE.value:
                 point: SitePoint | None = self._point_to_fix(site, event.point_key)
                 if point is not None:
                     changes.append(
@@ -212,13 +212,12 @@ class WatchService:
                 seen_at=event.created_at,
             )
             for event, site in noted_changes
-            if event.kind == "unreachable"
+            if event.kind == WatchEventKind.UNREACHABLE.value
         ]
 
     def upcoming_dates(self, db: Session, user_id: int, now: datetime) -> list[WatchDate]:
         """
-        The dates after which some sites will have a problem (a PHP branch's end, certificates that expire), each
-        with the sites it concerns.
+        The dates after which some sites will have a problem: a PHP branch's end, certificates that expire.
 
         Args:
             db: Active database session.
@@ -285,7 +284,7 @@ class WatchService:
         """
         return next((each for each in self.upcoming_dates(db, user_id, now) if each.key == key), None)
 
-    def followed_site_count(self, db: Session, user_id: int, now: datetime, *, reread_only: bool) -> int:
+    def followed_site_count(self, db: Session, user_id: int, now: datetime, *, is_reread_only: bool) -> int:
         """
         How many sites of the owner the watch follows, or how many of them it read again over the last days.
 
@@ -293,7 +292,7 @@ class WatchService:
             db: Active database session.
             user_id: The owner.
             now: The current instant (naive UTC).
-            reread_only: Count only the sites whose last check is at most seven days old.
+            is_reread_only: Count only the sites whose last check is at most seven days old.
 
         Returns:
             The count.
@@ -303,7 +302,7 @@ class WatchService:
             .select_from(SiteCareSite)
             .where(SiteCareSite.user_id == user_id, SiteCareSite.archived_at.is_(None))
         )
-        if reread_only:
+        if is_reread_only:
             followed = followed.where(SiteCareSite.checked_at >= now - timedelta(days=self._RECHECK_AFTER_DAYS))
         return int(db.execute(followed).scalar() or 0)
 
@@ -372,13 +371,13 @@ class WatchService:
             if mark in seen:
                 continue
             seen.add(mark)
-            if event.kind == "unreachable":
-                still_holds: bool = site.status == SiteStatus.UNREACHABLE.value
-            elif event.kind == "hacked":
-                still_holds = self._is_still_hacked(site)
+            if event.kind == WatchEventKind.UNREACHABLE.value:
+                is_still_holding: bool = site.status == SiteStatus.UNREACHABLE.value
+            elif event.kind == WatchEventKind.HACKED.value:
+                is_still_holding = self._is_still_hacked(site)
             else:
-                still_holds = self._point_to_fix(site, event.point_key) is not None
-            if still_holds:
+                is_still_holding = self._point_to_fix(site, event.point_key) is not None
+            if is_still_holding:
                 fresh.append((event, site))
         return fresh
 
